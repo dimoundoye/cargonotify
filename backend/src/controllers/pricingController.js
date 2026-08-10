@@ -1,0 +1,209 @@
+const pool = require('../config/db');
+
+function getEffectiveCompanyId(req) {
+  if (req.user && req.user.role === 'super_admin' && req.query.company_id) {
+    return parseInt(req.query.company_id, 10);
+  }
+  return (req.user && req.user.company_id) ? req.user.company_id : 1;
+}
+
+// Assurer l'existence de la table pricing_services et injecter les barèmes par défaut
+async function ensurePricingTableAndSeed(companyId) {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pricing_services (
+        id SERIAL PRIMARY KEY,
+        company_id INT NOT NULL DEFAULT 1,
+        code VARCHAR(50) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        default_rate DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        unit_type VARCHAR(20) DEFAULT 'per_cbm',
+        description TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    if (!companyId) companyId = 1;
+    const check = await pool.query('SELECT COUNT(*) FROM pricing_services WHERE company_id = $1', [companyId]);
+    if (parseInt(check.rows[0].count, 10) === 0) {
+      await pool.query(`
+        INSERT INTO pricing_services (company_id, code, name, default_rate, unit_type, description) VALUES
+        ($1, 'CBM_BASE', 'Tarif de base au CBM', 150000.00, 'per_cbm', 'Prix au mètre cube (CBM) standard (150.000 FCFA)'),
+        ($1, 'BALE', 'Service Balle (BALES)', 10000.00, 'per_unit', 'Frais par balle ou unité (10.000 FCFA)'),
+        ($1, 'COPY', 'Frais de Copie / Doc (COPY)', 6000.00, 'per_cbm', 'Frais de dossier par CBM (6.000 FCFA)'),
+        ($1, 'SAC', 'Frais par Sac (SACS)', 1000.00, 'per_unit', 'Frais par sac individuel (1.000 FCFA)'),
+        ($1, 'HEAVY_GOODS', 'Marchandises Lourdes', 15000.00, 'per_cbm', 'Supplément marchandises lourdes par CBM (15.000 FCFA)');
+      `, [companyId]);
+    }
+  } catch (err) {
+    console.error('Erreur ensurePricingTableAndSeed:', err.message);
+  }
+}
+
+// Obtenir tous les tarifs et services de l'entreprise
+async function getPricingServices(req, res) {
+  try {
+    const companyId = getEffectiveCompanyId(req);
+    await ensurePricingTableAndSeed(companyId);
+    const result = await pool.query('SELECT * FROM pricing_services WHERE company_id = $1 ORDER BY id ASC', [companyId]);
+    return res.json({ services: result.rows });
+  } catch (err) {
+    console.error('Erreur getPricingServices:', err);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+}
+
+// Mettre à jour un tarif (Pour tous les utilisateurs authentifiés)
+async function updatePricingService(req, res) {
+  try {
+    const { id } = req.params;
+    const companyId = getEffectiveCompanyId(req);
+    const { name, default_rate, unit_type, description, is_active } = req.body;
+
+    await ensurePricingTableAndSeed(companyId);
+
+    const result = await pool.query(`
+      UPDATE pricing_services
+      SET name = COALESCE($1, name),
+          default_rate = COALESCE($2, default_rate),
+          unit_type = COALESCE($3, unit_type),
+          description = COALESCE($4, description),
+          is_active = COALESCE($5, is_active),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $6 AND company_id = $7
+      RETURNING *
+    `, [name, default_rate, unit_type, description, is_active, id, companyId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Tarif non trouvé.' });
+    }
+
+    return res.json({ service: result.rows[0] });
+  } catch (err) {
+    console.error('Erreur updatePricingService:', err);
+    return res.status(500).json({ error: 'Erreur lors de la mise à jour du tarif.' });
+  }
+}
+
+// Créer un nouveau service ou barème (Pour tous les utilisateurs authentifiés)
+async function createPricingService(req, res) {
+  try {
+    const companyId = getEffectiveCompanyId(req);
+    const { code, name, default_rate, unit_type, description } = req.body;
+    if (!code || !name || default_rate === undefined) {
+      return res.status(400).json({ error: 'Code, nom et tarif de base obligatoires.' });
+    }
+
+    await ensurePricingTableAndSeed(companyId);
+
+    const result = await pool.query(`
+      INSERT INTO pricing_services (company_id, code, name, default_rate, unit_type, description)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [companyId, code.toUpperCase().trim(), name.trim(), parseFloat(default_rate), unit_type || 'per_cbm', description || null]);
+
+    return res.status(201).json({ service: result.rows[0] });
+  } catch (err) {
+    console.error('Erreur createPricingService:', err);
+    return res.status(500).json({ error: 'Erreur lors de la création du tarif.' });
+  }
+}
+
+// Supprimer un service ou barème (Pour tous les utilisateurs authentifiés)
+async function deletePricingService(req, res) {
+  try {
+    const { id } = req.params;
+    const companyId = getEffectiveCompanyId(req);
+    await ensurePricingTableAndSeed(companyId);
+    await pool.query('DELETE FROM pricing_services WHERE id = $1 AND company_id = $2', [id, companyId]);
+    return res.json({ message: 'Tarif supprimé avec succès.' });
+  } catch (err) {
+    console.error('Erreur deletePricingService:', err);
+    return res.status(500).json({ error: 'Erreur lors de la suppression.' });
+  }
+}
+
+// Obtenir tous les entrepôts de l'entreprise
+async function getWarehouses(req, res) {
+  try {
+    const companyId = getEffectiveCompanyId(req);
+    const result = await pool.query('SELECT * FROM warehouses WHERE company_id = $1 ORDER BY id ASC', [companyId]);
+    return res.json({ warehouses: result.rows });
+  } catch (err) {
+    console.error('Erreur getWarehouses:', err);
+    return res.status(500).json({ error: 'Erreur serveur.' });
+  }
+}
+
+// Créer un entrepôt pour l'entreprise
+async function createWarehouse(req, res) {
+  try {
+    const companyId = getEffectiveCompanyId(req);
+    const { name, address, city, phone } = req.body;
+    if (!name) return res.status(400).json({ error: 'Le nom de l’entrepôt est obligatoire.' });
+
+    const result = await pool.query(
+      'INSERT INTO warehouses (company_id, name, address, city, phone) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [companyId, name.trim(), address || null, city || 'Dakar', phone || null]
+    );
+
+    return res.status(201).json({ warehouse: result.rows[0] });
+  } catch (err) {
+    console.error('Erreur createWarehouse:', err);
+    return res.status(500).json({ error: 'Erreur lors de la création de l’entrepôt.' });
+  }
+}
+
+// Modifier un entrepôt
+async function updateWarehouse(req, res) {
+  try {
+    const { id } = req.params;
+    const companyId = getEffectiveCompanyId(req);
+    const { name, address, city, phone } = req.body;
+
+    const result = await pool.query(`
+      UPDATE warehouses
+      SET name = COALESCE($1, name),
+          address = COALESCE($2, address),
+          city = COALESCE($3, city),
+          phone = COALESCE($4, phone)
+      WHERE id = $5 AND company_id = $6
+      RETURNING *
+    `, [name, address, city, phone, id, companyId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Entrepôt non trouvé.' });
+    }
+
+    return res.json({ warehouse: result.rows[0] });
+  } catch (err) {
+    console.error('Erreur updateWarehouse:', err);
+    return res.status(500).json({ error: 'Erreur lors de la modification de l’entrepôt.' });
+  }
+}
+
+// Supprimer un entrepôt
+async function deleteWarehouse(req, res) {
+  try {
+    const { id } = req.params;
+    const companyId = getEffectiveCompanyId(req);
+    await pool.query('DELETE FROM warehouses WHERE id = $1 AND company_id = $2', [id, companyId]);
+    return res.json({ message: 'Entrepôt supprimé avec succès.' });
+  } catch (err) {
+    console.error('Erreur deleteWarehouse:', err);
+    return res.status(500).json({ error: 'Erreur lors de la suppression.' });
+  }
+}
+
+module.exports = {
+  getPricingServices,
+  updatePricingService,
+  createPricingService,
+  deletePricingService,
+  getWarehouses,
+  createWarehouse,
+  updateWarehouse,
+  deleteWarehouse
+};

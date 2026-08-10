@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Arrière-plan doux et élégant (Gris Slate adouci, non agressif pour les yeux) */
+    --background: 220 20% 96.5%;
+    --foreground: 240 60% 12%;
+
+    /* Cartes en blanc pur pour créer une profondeur haut de gamme */
+    --card: 0 0% 100%;
+    --card-foreground: 240 60% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 60% 12%;
+
+    --primary: 240 68% 25%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 92%;
+    --secondary-foreground: 240 68% 25%;
+
+    --muted: 220 14% 92%;
+    --muted-foreground: 240 15% 35%;
+
+    --accent: 4 90% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 240 68% 25%;
+
+    --radius: 0.75rem;
+
+    --gradient-primary: linear-gradient(135deg, hsl(240 68% 25%), hsl(240 80% 35%));
+    --gradient-accent: linear-gradient(135deg, hsl(4 90% 58%), hsl(14 90% 65%));
+    --shadow-soft: 0 2px 8px -2px hsl(240 68% 25% / 0.06);
+    --shadow-medium: 0 8px 24px -4px hsl(240 68% 25% / 0.10);
+    --shadow-strong: 0 16px 40px -8px hsl(240 68% 25% / 0.14);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 60% 18%;
+    --sidebar-primary: 240 68% 25%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 92%;
+    --sidebar-accent-foreground: 240 68% 25%;
+    --sidebar-border: 220 13% 88%;
+  }
+
+  .dark {
+    --background: 240 60% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 50% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 50% 12%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 240 68% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 30% 18%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 30% 18%;
+    --muted-foreground: 240 10% 80%;
+
+    --accent: 4 90% 58%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 30% 18%;
+    --input: 240 30% 18%;
+    --ring: 240 68% 45%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(240 68% 35%), hsl(240 80% 45%));
+    --gradient-accent: linear-gradient(135deg, hsl(4 90% 58%), hsl(14 90% 65%));
+  }
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--background));
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--border));
+}
+
+.dark .glass-panel {
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid hsl(var(--border));
+}
