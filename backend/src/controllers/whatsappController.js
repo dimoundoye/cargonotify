@@ -76,15 +76,17 @@ async function getContainerNotificationPreview(req, res) {
     const warehousesQuery = await pool.query('SELECT * FROM warehouses WHERE company_id = $1 ORDER BY id ASC', [companyId]);
     const warehousesList = warehousesQuery.rows;
 
-    let pickupLocationsText = '';
+    let defaultPickupLocationsText = '';
     if (warehousesList && warehousesList.length > 0) {
       const numberEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
-      pickupLocationsText = warehousesList.map((w, idx) => {
+      defaultPickupLocationsText = warehousesList.map((w, idx) => {
         const emoji = numberEmojis[idx] || `${idx + 1}.`;
-        return `${emoji} ${w.name}${w.address ? ' : ' + w.address : ''}`;
+        const addr = w.address ? ` : ${w.address}` : '';
+        const phone = w.phone ? ` (Tél : ${w.phone})` : '';
+        return `${emoji} ${w.name}${addr}${phone}`;
       }).join('\n');
     } else {
-      pickupLocationsText = '1️⃣ Entrepôt Médina : Rue 1X8, Médina\n2️⃣ Entrepôt Cambérène : Cité Faycal (au niveau des dépôts du lac)';
+      defaultPickupLocationsText = company.address ? `📍 ${company.address}` : `📍 Contactez notre service client au ${company.phone || 'numéro habituel'} pour le lieu de retrait.`;
     }
 
     const query = `
@@ -96,6 +98,8 @@ async function getContainerNotificationPreview(req, res) {
         cl.name AS client_name,
         cl.phone AS client_phone,
         w.name AS warehouse_name,
+        w.address AS warehouse_address,
+        w.phone AS warehouse_phone,
         COALESCE(SUM(p.amount_paid), 0) AS total_paid,
         (l.final_amount - COALESCE(SUM(p.amount_paid), 0)) AS remaining_balance
       FROM lots l
@@ -103,13 +107,22 @@ async function getContainerNotificationPreview(req, res) {
       LEFT JOIN warehouses w ON l.warehouse_id = w.id
       LEFT JOIN payments p ON l.id = p.lot_id
       WHERE l.container_id = $1 AND l.company_id = $2
-      GROUP BY l.id, cl.id, w.id
+      GROUP BY l.id, cl.id, w.id, w.name, w.address, w.phone
     `;
     const result = await pool.query(query, [containerId, companyId]);
 
     const notifications = result.rows.map(item => {
       const cleanPhone = item.client_phone.replace(/\D/g, '');
       const fullPhone = cleanPhone.startsWith('221') ? cleanPhone : `221${cleanPhone}`;
+
+      // Lieu de retrait propre au lot s'il est spécifié, sinon entrepôts de l'entreprise
+      const itemAddr = item.warehouse_address ? ` : ${item.warehouse_address}` : '';
+      const itemPhone = item.warehouse_phone ? ` (Tél : ${item.warehouse_phone})` : '';
+
+      const pickupLocationsText = item.warehouse_name 
+        ? `📍 ${item.warehouse_name}${itemAddr}${itemPhone}`
+        : defaultPickupLocationsText;
+
       const messageText = formatArrivalMessage(
         company.company_name,
         company.phone,
@@ -159,6 +172,18 @@ async function sendBulkNotifications(req, res) {
     for (const item of notifications) {
       let status = 'sent';
       let errorMsg = null;
+
+      const cleanPhone = (item.client_phone || '').replace(/\D/g, '');
+      if (!cleanPhone || cleanPhone.length < 6) {
+        failCount++;
+        const logRes = await pool.query(`
+          INSERT INTO whatsapp_logs (company_id, client_id, container_id, phone, message, status)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING *
+        `, [companyId, item.client_id || null, containerId || null, item.client_phone || 'N/A', item.message, 'failed']);
+        logs.push(logRes.rows[0]);
+        continue;
+      }
 
       try {
         await whatsappService.sendTextMessage(companyId, item.client_phone, item.message);

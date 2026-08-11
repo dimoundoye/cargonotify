@@ -1,18 +1,28 @@
 const pool = require('../config/db');
 
-// Assurer l'existence des tables et colonnes de configuration
+// Assurer l'existence des tables et colonnes de configuration et de contrôle d'accès
 async function ensureTablesAndColumns() {
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS platform_settings (
+    CREATE TABLE IF NOT EXISTS company_settings (
       id INT PRIMARY KEY DEFAULT 1,
+      company_name VARCHAR(255) NOT NULL DEFAULT 'CargoNotify Transit & Logistique',
+      phone VARCHAR(100) NOT NULL DEFAULT '+221 77 872 16 15',
+      email VARCHAR(255) NOT NULL DEFAULT 'contact@cargonotify.sn',
+      address TEXT NOT NULL DEFAULT 'Dakar, Sénégal',
+      currency VARCHAR(50) NOT NULL DEFAULT 'FCFA',
       maintenance_mode BOOLEAN DEFAULT FALSE,
       maintenance_message TEXT DEFAULT 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !',
+      signature_base64 TEXT,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
-    INSERT INTO platform_settings (id, maintenance_mode, maintenance_message)
-    VALUES (1, FALSE, 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !')
+    INSERT INTO company_settings (id, company_name, phone, email, address, currency)
+    VALUES (1, 'CargoNotify Transit & Logistique', '+221 77 872 16 15', 'contact@cargonotify.sn', 'Dakar, Sénégal', 'FCFA')
     ON CONFLICT (id) DO NOTHING;
+
+    ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS maintenance_mode BOOLEAN DEFAULT FALSE;
+    ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS maintenance_message TEXT DEFAULT 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !';
+    ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS signature_base64 TEXT;
 
     ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
   `);
@@ -20,43 +30,30 @@ async function ensureTablesAndColumns() {
 
 ensureTablesAndColumns().catch(err => console.error('Erreur init DB settings:', err));
 
-// Helper d'accès au profil d'une entreprise et au statut de maintenance
-async function getCompanySettingsData(companyId = 1) {
+// Helper d'accès direct au profil et statut maintenance
+async function getCompanySettingsData() {
   try {
-    const compRes = await pool.query('SELECT * FROM companies WHERE id = $1', [companyId]);
-    const platformRes = await pool.query('SELECT * FROM platform_settings WHERE id = 1');
-
-    const comp = compRes.rows[0] || {};
-    const platform = platformRes.rows[0] || {};
-
-    return {
-      company_name: comp.name || '',
-      phone: comp.phone || '',
-      email: comp.email || '',
-      address: comp.address || '',
-      currency: comp.currency || 'FCFA',
-      maintenance_mode: platform.maintenance_mode || false,
-      maintenance_message: platform.maintenance_message || 'CargoNotify est actuellement en cours de maintenance.'
-    };
+    const res = await pool.query('SELECT * FROM company_settings WHERE id = 1');
+    if (res.rows.length > 0) return res.rows[0];
   } catch (e) {
     console.error('Erreur getCompanySettingsData:', e);
-    return {
-      company_name: '',
-      phone: '',
-      email: '',
-      address: '',
-      currency: 'FCFA',
-      maintenance_mode: false,
-      maintenance_message: 'CargoNotify est actuellement en cours de maintenance.'
-    };
   }
+  return {
+    company_name: 'CargoNotify Transit & Logistique',
+    phone: '+221 77 872 16 15',
+    email: 'contact@cargonotify.sn',
+    address: 'Dakar, Sénégal',
+    currency: 'FCFA',
+    maintenance_mode: false,
+    maintenance_message: 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !',
+    signature_base64: null
+  };
 }
 
-// Route API: Obtenir le profil de l'entreprise connectée
+// Route API: Obtenir le profil de l'entreprise & statut système
 async function getCompanySettings(req, res) {
   try {
-    const companyId = (req.user && req.user.company_id) ? req.user.company_id : 1;
-    const data = await getCompanySettingsData(companyId);
+    const data = await getCompanySettingsData();
     return res.json({ settings: data });
   } catch (err) {
     console.error('Erreur getCompanySettings:', err);
@@ -64,38 +61,37 @@ async function getCompanySettings(req, res) {
   }
 }
 
-// Route API: Mettre à jour le mode maintenance (Super Admin) ou le profil société
+// Route API: Mettre à jour le profil & Cachet/Signature (Admin)
 async function updateCompanySettings(req, res) {
   try {
-    const { company_name, phone, email, address, currency, maintenance_mode, maintenance_message } = req.body;
-    const companyId = (req.user && req.user.company_id) ? req.user.company_id : 1;
+    const { company_name, phone, email, address, currency, maintenance_mode, maintenance_message, signature_base64 } = req.body;
 
-    // Mise à jour de la société de l'utilisateur s'il y a des modifications de profil
-    if (company_name || phone || email || address || currency) {
-      await pool.query(`
-        UPDATE companies
-        SET name = COALESCE($1, name),
-            phone = COALESCE($2, phone),
-            email = COALESCE($3, email),
-            address = COALESCE($4, address),
-            currency = COALESCE($5, currency)
-        WHERE id = $6
-      `, [company_name, phone, email, address, currency, companyId]);
-    }
+    const result = await pool.query(`
+      INSERT INTO company_settings (id, company_name, phone, email, address, currency, maintenance_mode, maintenance_message, signature_base64, updated_at)
+      VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+      ON CONFLICT (id) DO UPDATE
+      SET company_name = COALESCE(EXCLUDED.company_name, company_settings.company_name),
+          phone = COALESCE(EXCLUDED.phone, company_settings.phone),
+          email = COALESCE(EXCLUDED.email, company_settings.email),
+          address = COALESCE(EXCLUDED.address, company_settings.address),
+          currency = COALESCE(EXCLUDED.currency, company_settings.currency),
+          maintenance_mode = EXCLUDED.maintenance_mode,
+          maintenance_message = COALESCE(EXCLUDED.maintenance_message, company_settings.maintenance_message),
+          signature_base64 = COALESCE(EXCLUDED.signature_base64, company_settings.signature_base64),
+          updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [
+      company_name || 'CargoNotify Transit & Logistique',
+      phone || '+221 77 872 16 15',
+      email || 'contact@cargonotify.sn',
+      address || 'Dakar, Sénégal',
+      currency || 'FCFA',
+      maintenance_mode === true,
+      maintenance_message || 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !',
+      signature_base64 || null
+    ]);
 
-    // Si Super Admin modifie le mode maintenance global
-    if (req.user && req.user.role === 'super_admin' && maintenance_mode !== undefined) {
-      await pool.query(`
-        UPDATE platform_settings
-        SET maintenance_mode = $1,
-            maintenance_message = COALESCE($2, maintenance_message),
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = 1
-      `, [maintenance_mode === true, maintenance_message]);
-    }
-
-    const updatedData = await getCompanySettingsData(companyId);
-    return res.json({ settings: updatedData, message: 'Paramètres enregistrés avec succès !' });
+    return res.json({ settings: result.rows[0], message: 'Paramètres enregistrés avec succès !' });
   } catch (err) {
     console.error('Erreur updateCompanySettings:', err);
     return res.status(500).json({ error: 'Erreur lors de l’enregistrement des paramètres.' });

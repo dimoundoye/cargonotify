@@ -118,10 +118,10 @@ async function ensureLotColumns() {
       ALTER TABLE lots ADD COLUMN IF NOT EXISTS heavy_goods_amount NUMERIC DEFAULT 0;
     `);
   } catch (err) {
-    console.error('Erreur ensureLotColumns:', err.message);
+    // Ignorer si les colonnes existent déjà
   }
 }
-ensureLotColumns();
+setTimeout(ensureLotColumns, 1000);
 
 // Créer un lot de marchandise pour un client dans un conteneur
 async function createLot(req, res) {

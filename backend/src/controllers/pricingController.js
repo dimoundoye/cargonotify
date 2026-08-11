@@ -7,38 +7,25 @@ function getEffectiveCompanyId(req) {
   return (req.user && req.user.company_id) ? req.user.company_id : 1;
 }
 
-// Assurer l'existence de la table pricing_services et injecter les barèmes par défaut
-async function ensurePricingTableAndSeed(companyId) {
+// Injecter les barèmes de tarification par défaut pour une entreprise selon le cahier des charges
+async function seedDefaultCompanyPricing(companyId) {
   try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS pricing_services (
-        id SERIAL PRIMARY KEY,
-        company_id INT NOT NULL DEFAULT 1,
-        code VARCHAR(50) NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        default_rate DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-        unit_type VARCHAR(20) DEFAULT 'per_cbm',
-        description TEXT,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    if (!companyId) companyId = 1;
+    if (!companyId) return;
     const check = await pool.query('SELECT COUNT(*) FROM pricing_services WHERE company_id = $1', [companyId]);
     if (parseInt(check.rows[0].count, 10) === 0) {
       await pool.query(`
         INSERT INTO pricing_services (company_id, code, name, default_rate, unit_type, description) VALUES
-        ($1, 'CBM_BASE', 'Tarif de base au CBM', 150000.00, 'per_cbm', 'Prix au mètre cube (CBM) standard (150.000 FCFA)'),
-        ($1, 'BALE', 'Service Balle (BALES)', 10000.00, 'per_unit', 'Frais par balle ou unité (10.000 FCFA)'),
-        ($1, 'COPY', 'Frais de Copie / Doc (COPY)', 6000.00, 'per_cbm', 'Frais de dossier par CBM (6.000 FCFA)'),
-        ($1, 'SAC', 'Frais par Sac (SACS)', 1000.00, 'per_unit', 'Frais par sac individuel (1.000 FCFA)'),
-        ($1, 'HEAVY_GOODS', 'Marchandises Lourdes', 15000.00, 'per_cbm', 'Supplément marchandises lourdes par CBM (15.000 FCFA)');
+        ($1, 'CBM_BASE', 'Tarif de base au CBM', 150000.00, 'per_cbm', 'Prix au mètre cube (CBM) standard'),
+        ($1, 'BALE', 'Service Balle / Ballot', 10000.00, 'per_unit', 'Frais par balle ou ballot d’emballage'),
+        ($1, 'COPY', 'Frais de Copie / Document', 6000.00, 'per_cbm', 'Frais de dossier/copie par CBM'),
+        ($1, 'SAC', 'Frais par Sac / Colis', 10000.00, 'per_unit', 'Frais par sac individuel'),
+        ($1, 'SMALL_PACKING', 'Petit Emballage / Carton', 5000.00, 'per_unit', 'Frais petit colis ou carton individuel'),
+        ($1, 'HEAVY_GOODS', 'Marchandises Lourdes', 15000.00, 'per_cbm', 'Supplément marchandises lourdes par CBM')
+        ON CONFLICT DO NOTHING;
       `, [companyId]);
     }
   } catch (err) {
-    console.error('Erreur ensurePricingTableAndSeed:', err.message);
+    console.error('Erreur seedDefaultCompanyPricing:', err.message);
   }
 }
 
@@ -46,7 +33,7 @@ async function ensurePricingTableAndSeed(companyId) {
 async function getPricingServices(req, res) {
   try {
     const companyId = getEffectiveCompanyId(req);
-    await ensurePricingTableAndSeed(companyId);
+    await seedDefaultCompanyPricing(companyId);
     const result = await pool.query('SELECT * FROM pricing_services WHERE company_id = $1 ORDER BY id ASC', [companyId]);
     return res.json({ services: result.rows });
   } catch (err) {
@@ -55,14 +42,12 @@ async function getPricingServices(req, res) {
   }
 }
 
-// Mettre à jour un tarif (Pour tous les utilisateurs authentifiés)
+// Mettre à jour un tarif (Admin)
 async function updatePricingService(req, res) {
   try {
     const { id } = req.params;
     const companyId = getEffectiveCompanyId(req);
     const { name, default_rate, unit_type, description, is_active } = req.body;
-
-    await ensurePricingTableAndSeed(companyId);
 
     const result = await pool.query(`
       UPDATE pricing_services
@@ -70,8 +55,7 @@ async function updatePricingService(req, res) {
           default_rate = COALESCE($2, default_rate),
           unit_type = COALESCE($3, unit_type),
           description = COALESCE($4, description),
-          is_active = COALESCE($5, is_active),
-          updated_at = CURRENT_TIMESTAMP
+          is_active = COALESCE($5, is_active)
       WHERE id = $6 AND company_id = $7
       RETURNING *
     `, [name, default_rate, unit_type, description, is_active, id, companyId]);
@@ -87,7 +71,7 @@ async function updatePricingService(req, res) {
   }
 }
 
-// Créer un nouveau service ou barème (Pour tous les utilisateurs authentifiés)
+// Créer un nouveau service ou barème (Admin)
 async function createPricingService(req, res) {
   try {
     const companyId = getEffectiveCompanyId(req);
@@ -96,13 +80,16 @@ async function createPricingService(req, res) {
       return res.status(400).json({ error: 'Code, nom et tarif de base obligatoires.' });
     }
 
-    await ensurePricingTableAndSeed(companyId);
-
     const result = await pool.query(`
       INSERT INTO pricing_services (company_id, code, name, default_rate, unit_type, description)
       VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT DO NOTHING
       RETURNING *
     `, [companyId, code.toUpperCase().trim(), name.trim(), parseFloat(default_rate), unit_type || 'per_cbm', description || null]);
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: 'Un tarif avec ce code existe déjà.' });
+    }
 
     return res.status(201).json({ service: result.rows[0] });
   } catch (err) {
@@ -111,12 +98,11 @@ async function createPricingService(req, res) {
   }
 }
 
-// Supprimer un service ou barème (Pour tous les utilisateurs authentifiés)
+// Supprimer un service ou barème (Admin)
 async function deletePricingService(req, res) {
   try {
     const { id } = req.params;
     const companyId = getEffectiveCompanyId(req);
-    await ensurePricingTableAndSeed(companyId);
     await pool.query('DELETE FROM pricing_services WHERE id = $1 AND company_id = $2', [id, companyId]);
     return res.json({ message: 'Tarif supprimé avec succès.' });
   } catch (err) {
@@ -205,5 +191,6 @@ module.exports = {
   getWarehouses,
   createWarehouse,
   updateWarehouse,
-  deleteWarehouse
+  deleteWarehouse,
+  seedDefaultCompanyPricing
 };

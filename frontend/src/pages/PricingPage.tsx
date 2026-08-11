@@ -22,6 +22,7 @@ export const PricingPage: React.FC = () => {
   const [whAddress, setWhAddress] = useState('');
   const [whCity, setWhCity] = useState('Dakar');
   const [whPhone, setWhPhone] = useState('');
+  const [whIsDefault, setWhIsDefault] = useState(true);
   const [submittingWh, setSubmittingWh] = useState(false);
 
   const loadData = async () => {
@@ -71,6 +72,7 @@ export const PricingPage: React.FC = () => {
     setWhAddress('');
     setWhCity('Dakar');
     setWhPhone('');
+    setWhIsDefault(true);
     setIsWarehouseModalOpen(true);
   };
 
@@ -80,6 +82,7 @@ export const PricingPage: React.FC = () => {
     setWhAddress(w.address || '');
     setWhCity(w.city || 'Dakar');
     setWhPhone(w.phone || '');
+    setWhIsDefault(w.is_default_pickup !== false);
     setIsWarehouseModalOpen(true);
   };
 
@@ -94,14 +97,16 @@ export const PricingPage: React.FC = () => {
           name: whName,
           address: whAddress,
           city: whCity,
-          phone: whPhone
+          phone: whPhone,
+          is_default_pickup: whIsDefault
         });
       } else {
         await api.post('/warehouses', {
           name: whName,
           address: whAddress,
           city: whCity,
-          phone: whPhone
+          phone: whPhone,
+          is_default_pickup: whIsDefault
         });
       }
 
@@ -266,11 +271,20 @@ export const PricingPage: React.FC = () => {
               {warehouses.map((w, idx) => (
                 <div key={w.id} className="p-4 rounded-2xl bg-secondary/50 border border-border flex items-start justify-between gap-3">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-600 font-extrabold text-xs flex items-center justify-center">
                         {idx + 1}
                       </span>
                       <h4 className="font-extrabold text-sm text-foreground">{w.name}</h4>
+                      {w.is_default_pickup !== false ? (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-extrabold">
+                          ✓ WhatsApp Défaut
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-secondary text-muted-foreground text-[10px] font-semibold">
+                          Non coché par défaut
+                        </span>
+                      )}
                     </div>
                     {w.address && (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -413,6 +427,18 @@ export const PricingPage: React.FC = () => {
                     className="w-full px-3.5 py-2.5 bg-secondary border border-border rounded-xl font-medium"
                   />
                 </div>
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer select-none text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={whIsDefault}
+                    onChange={(e) => setWhIsDefault(e.target.checked)}
+                    className="w-4 h-4 rounded text-primary border-border focus:ring-primary accent-primary"
+                  />
+                  <span>Cocher par défaut cet entrepôt dans les notifications WhatsApp</span>
+                </label>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">

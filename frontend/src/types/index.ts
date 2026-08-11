@@ -63,6 +63,7 @@ export interface Warehouse {
   address?: string | null;
   city?: string | null;
   phone?: string | null;
+  is_default_pickup?: boolean | null;
 }
 
 export interface PricingService {

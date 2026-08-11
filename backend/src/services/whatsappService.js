@@ -96,7 +96,7 @@ async function initWhatsApp(companyId = 1) {
 
       if (connection === 'close') {
         const statusCode = lastDisconnect?.error?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 401;
 
         session.isConnected = false;
         session.connectedPhone = null;
@@ -107,16 +107,17 @@ async function initWhatsApp(companyId = 1) {
 
         if (shouldReconnect) {
           session.statusText = 'Reconnexion en cours...';
-          setTimeout(() => initWhatsApp(cid), 5000);
+          setTimeout(() => initWhatsApp(cid).catch(() => {}), 5000);
         } else {
           session.statusText = 'Déconnecté (Session expirée). Scannez à nouveau.';
+          clearSession(cid);
         }
       }
     });
 
     return { isConnected: session.isConnected, qrCodeDataUrl: session.qrCodeDataUrl, statusText: session.statusText };
   } catch (err) {
-    console.error(`Erreur initWhatsApp (Entreprise ${cid}):`, err);
+    console.error(`Erreur initWhatsApp (Entreprise ${cid}):`, err.message);
     session.isInitializing = false;
     session.statusText = 'Erreur de connexion';
     return { isConnected: false, error: err.message };
@@ -139,7 +140,7 @@ async function getStatus(companyId = 1) {
   const cid = companyId || 1;
   const session = getSessionState(cid);
   if (!session.sock && !session.isInitializing) {
-    await initWhatsApp(cid);
+    await initWhatsApp(cid).catch(() => {});
   }
   return {
     companyId: cid,
@@ -192,7 +193,7 @@ async function disconnect(companyId = 1) {
 
 // Initialiser l'entreprise par défaut au démarrage
 setTimeout(() => {
-  initWhatsApp(1);
+  initWhatsApp(1).catch(() => {});
 }, 2000);
 
 module.exports = {

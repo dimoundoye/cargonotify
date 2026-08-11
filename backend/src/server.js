@@ -9,10 +9,10 @@ const pool = require('./config/db');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middlewares
+// Middlewares avec limite de payload augmentée (25 Mo) pour accepter les images de cachet et logos
 app.use(cors({ origin: '*' }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
 // Health Check
 app.get('/health', async (req, res) => {
@@ -42,6 +42,9 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Erreur interne du serveur.' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Serveur CargoNotify lancé sur http://localhost:${PORT}`);
 });
+
+// Maintenir l'Event Loop Node.js indéfiniment actif
+setInterval(() => {}, 60000);

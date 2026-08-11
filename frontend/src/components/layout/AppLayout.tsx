@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { toast } from 'sonner';
 import { 
   LayoutDashboard, 
   Container, 
@@ -51,11 +52,15 @@ export const AppLayout: React.FC = () => {
   }, []);
 
   const handleInstallPWA = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+      toast.info("Pour installer l'application sur votre écran d'accueil : appuyez sur le menu du navigateur (ou Partager sur Safari iOS) ➔ 'Ajouter à l'écran d'accueil'.");
+      return;
+    }
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       setDeferredPrompt(null);
+      toast.success("Installation de CargoNotify acceptée !");
     }
   };
 
@@ -231,16 +236,14 @@ export const AppLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {deferredPrompt && (
-              <button
-                onClick={handleInstallPWA}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all text-xs font-bold shadow-sm"
-                title="Installer l'application sur cet appareil"
-              >
-                <Download className="w-4 h-4 animate-bounce" />
-                <span className="hidden sm:inline">Installer l'App</span>
-              </button>
-            )}
+            <button
+              onClick={handleInstallPWA}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all text-xs font-bold shadow-sm"
+              title="Installer l'application sur cet appareil"
+            >
+              <Download className="w-4 h-4 animate-bounce shrink-0" />
+              <span className="text-[11px] sm:text-xs font-extrabold whitespace-nowrap">Installer l'App</span>
+            </button>
 
             <button
               onClick={toggleTheme}
@@ -307,6 +310,17 @@ export const AppLayout: React.FC = () => {
                     </NavLink>
                   );
                 })}
+
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleInstallPWA();
+                  }}
+                  className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-extrabold text-xs bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white transition-all shadow-sm"
+                >
+                  <Download className="w-4 h-4 animate-bounce" />
+                  <span>Installer l'App sur Mobile</span>
+                </button>
               </nav>
 
               {/* Carte Utilisateur Mobile */}

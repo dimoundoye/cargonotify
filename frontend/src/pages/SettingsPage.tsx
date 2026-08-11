@@ -4,6 +4,7 @@ import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { PricingService, Warehouse } from '../types';
 import { formatFCFA } from '../lib/utils';
+import { SignatureScannerModal } from '../components/SignatureScannerModal';
 import { 
   Settings, 
   Building2, 
@@ -22,6 +23,8 @@ import {
   ShieldCheck, 
   Save,
   Sliders,
+  Stamp,
+  Upload,
   X,
   AlertCircle
 } from 'lucide-react';
@@ -36,6 +39,9 @@ export const SettingsPage: React.FC = () => {
   const [companyEmail, setCompanyEmail] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
   const [currency, setCurrency] = useState('FCFA');
+  const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+
   const [generalSaveSuccess, setGeneralSaveSuccess] = useState(false);
   const [savingGeneral, setSavingGeneral] = useState(false);
 
@@ -90,6 +96,7 @@ export const SettingsPage: React.FC = () => {
         setCompanyEmail(s.email);
         setCompanyAddress(s.address);
         setCurrency(s.currency);
+        setSignatureBase64(s.signature_base64 || null);
       }
 
       setWarehouses(whRes.data.warehouses);
@@ -116,7 +123,8 @@ export const SettingsPage: React.FC = () => {
         phone: companyPhone,
         email: companyEmail,
         address: companyAddress,
-        currency
+        currency,
+        signature_base64: signatureBase64
       });
 
       setGeneralSaveSuccess(true);
@@ -125,6 +133,40 @@ export const SettingsPage: React.FC = () => {
       console.error('Erreur enregistrement profil entreprise:', err);
     } finally {
       setSavingGeneral(false);
+    }
+  };
+
+  const handleSaveSignature = async (base64Png: string) => {
+    setSignatureBase64(base64Png);
+    try {
+      await api.put('/settings/company', {
+        company_name: companyName,
+        phone: companyPhone,
+        email: companyEmail,
+        address: companyAddress,
+        currency,
+        signature_base64: base64Png
+      });
+      setGeneralSaveSuccess(true);
+      setTimeout(() => setGeneralSaveSuccess(false), 4000);
+    } catch (err) {
+      console.error('Erreur sauvegarde signature:', err);
+    }
+  };
+
+  const handleRemoveSignature = async () => {
+    setSignatureBase64(null);
+    try {
+      await api.put('/settings/company', {
+        company_name: companyName,
+        phone: companyPhone,
+        email: companyEmail,
+        address: companyAddress,
+        currency,
+        signature_base64: null
+      });
+    } catch (err) {
+      console.error('Erreur suppression signature:', err);
     }
   };
 
@@ -286,7 +328,7 @@ export const SettingsPage: React.FC = () => {
           <Settings className="w-7 h-7 text-primary" />
           <span>Paramètres du Système</span>
         </h1>
-        <p className="text-sm text-muted-foreground">Gérez le profil de votre entreprise, les tarifs CBM, vos lieux de retrait et la sécurité du compte.</p>
+        <p className="text-sm text-muted-foreground">Gérez le profil de votre entreprise, votre cachet/signature officielle, les tarifs CBM et vos lieux de retrait.</p>
       </div>
 
       {/* Sub-Tabs Selector */}
@@ -300,7 +342,7 @@ export const SettingsPage: React.FC = () => {
           }`}
         >
           <Building2 className="w-4 h-4 text-primary" />
-          <span>Général & Entreprise</span>
+          <span>Général, Cachet & Entreprise</span>
         </button>
 
         <button
@@ -328,18 +370,18 @@ export const SettingsPage: React.FC = () => {
         </button>
       </div>
 
-      {/* TAB 1: Général & Entreprise */}
+      {/* TAB 1: Général, Cachet & Entreprise */}
       {activeTab === 'general' && (
         <div className="space-y-8 animate-in fade-in duration-200">
           {generalSaveSuccess && (
             <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 font-bold text-xs flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5" />
-              <span>Profil de l'entreprise enregistré avec succès en base de données !</span>
+              <span>Paramètres de l'entreprise et Cachet Officiel enregistrés avec succès !</span>
             </div>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Formulaire Profil Société */}
+            {/* Formulaire Profil Société & Cachet */}
             <div className="lg:col-span-1 space-y-6">
               <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-5">
                 <h2 className="text-base font-extrabold flex items-center gap-2">
@@ -425,6 +467,54 @@ export const SettingsPage: React.FC = () => {
                     <span>{savingGeneral ? 'Enregistrement BD...' : 'Enregistrer le Profil'}</span>
                   </button>
                 </form>
+              </div>
+
+              {/* Cachet & Signature de l'Entreprise Card */}
+              <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-extrabold flex items-center gap-2">
+                    <Stamp className="w-5 h-5 text-amber-500" />
+                    <span>Cachet Officiel & Signature</span>
+                  </h2>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Le cachet numérisé avec fond transparent est automatiquement apposé sur la partie droite de vos reçus de paiement PDF (à côté du QR code).
+                </p>
+
+                {signatureBase64 ? (
+                  <div className="p-4 rounded-2xl bg-secondary/50 border border-border flex flex-col items-center gap-3">
+                    <div className="p-3 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:10px_10px] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] border border-border rounded-xl">
+                      <img src={signatureBase64} alt="Cachet Entreprise" className="max-h-28 object-contain" />
+                    </div>
+                    <div className="flex items-center gap-2 w-full">
+                      <button
+                        onClick={() => setIsScannerOpen(true)}
+                        className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow hover:bg-primary/90 flex items-center justify-center gap-1.5"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Changer</span>
+                      </button>
+                      <button
+                        onClick={handleRemoveSignature}
+                        className="px-3 py-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold text-xs border border-red-500/20 flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Effacer</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setIsScannerOpen(true)}
+                    className="w-full py-4 border-2 border-dashed border-border rounded-2xl bg-secondary/30 hover:bg-secondary/60 flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-all"
+                  >
+                    <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-500">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <span className="font-extrabold text-xs text-foreground">Ajouter la Photo de votre Cachet / Signature</span>
+                    <span className="text-[10px] text-muted-foreground">Suppression automatique du fond blanc inclus</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -532,7 +622,7 @@ Pour toute question, contactez-nous directement au ${companyPhone}.`}
                 <Sliders className="w-5 h-5 text-primary" />
                 <span>Barèmes de Tarification CBM & Services Annexes</span>
               </h2>
-              <p className="text-xs text-muted-foreground">Ajustez les tarifs au CBM, frais par balle, copie, sac et marchandises lourdes.</p>
+              <p className="text-xs text-muted-foreground">Ajustez les tarifs au m³ (CBM), frais par balle, copie, sac et marchandises lourdes.</p>
             </div>
 
             <button
@@ -576,7 +666,7 @@ Pour toute question, contactez-nous directement au ${companyPhone}.`}
 
                 <div className="p-4 rounded-2xl bg-secondary/50 border border-border flex items-center justify-between">
                   <span className="text-xs font-semibold text-muted-foreground">
-                    Tarif par {service.unit_type === 'per_cbm' ? 'CBM' : 'Unité'} :
+                    Tarif par {service.unit_type === 'per_cbm' ? 'CBM (m³)' : 'Unité'} :
                   </span>
                   <span className="text-base font-black text-primary truncate">{formatFCFA(service.default_rate)}</span>
                 </div>
@@ -699,6 +789,14 @@ Pour toute question, contactez-nous directement au ${companyPhone}.`}
         </div>
       )}
 
+      {/* Modal Numérisation Cachet / Signature */}
+      <SignatureScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onSave={handleSaveSignature}
+        existingSignatureUrl={signatureBase64}
+      />
+
       {/* Modal Edition Tarif avec React Portal */}
       {editingService && createPortal(
         <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -785,7 +883,7 @@ Pour toute question, contactez-nous directement au ${companyPhone}.`}
                     onChange={(e: any) => setNewUnitType(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-secondary border border-border rounded-xl font-bold"
                   >
-                    <option value="per_cbm">Par CBM</option>
+                    <option value="per_cbm">Par CBM (m³)</option>
                     <option value="per_unit">Par Unité / Pièce</option>
                   </select>
                 </div>

@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import api from '../lib/api';
-import { Container } from '../types';
-import { MessageSquare, Send, CheckCircle2, QrCode, Smartphone, RefreshCw, LogOut, CheckSquare, Square, AlertCircle, Sparkles, X, Eye } from 'lucide-react';
+import { Container, Warehouse } from '../types';
+import { MessageSquare, Send, CheckCircle2, QrCode, Smartphone, RefreshCw, LogOut, CheckSquare, Square, AlertCircle, Sparkles, X, Eye, MapPin } from 'lucide-react';
 import { SearchableSelect } from '../components/ui/SearchableSelect';
 
 interface NotificationItem {
@@ -29,9 +29,11 @@ export const WhatsAppPage: React.FC = () => {
   const initialContainerId = searchParams.get('containerId');
 
   const [containers, setContainers] = useState<Container[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [selectedContainerId, setSelectedContainerId] = useState<string>(initialContainerId || '');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [selectedLotIds, setSelectedLotIds] = useState<number[]>([]);
+  const [clientWarehouseSelection, setClientWarehouseSelection] = useState<Record<number, number[]>>({});
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
@@ -73,15 +75,23 @@ export const WhatsAppPage: React.FC = () => {
     }
   };
 
+  const isPhoneValid = (phone?: string) => {
+    if (!phone) return false;
+    const clean = phone.replace(/\D/g, '');
+    return clean.length >= 6;
+  };
+
   const loadContainersAndLogs = async () => {
     try {
-      const [cRes, lRes] = await Promise.all([
+      const [cRes, lRes, wRes] = await Promise.all([
         api.get('/containers'),
-        api.get('/whatsapp/logs')
+        api.get('/whatsapp/logs'),
+        api.get('/warehouses')
       ]);
 
       setContainers(cRes.data.containers);
       setLogs(lRes.data.logs);
+      setWarehouses(wRes.data.warehouses);
 
       if (cRes.data.containers.length > 0 && !selectedContainerId) {
         setSelectedContainerId(String(cRes.data.containers[0].id));
@@ -91,13 +101,57 @@ export const WhatsAppPage: React.FC = () => {
     }
   };
 
+  const generateLocationsText = (whIds: number[], allWh: Warehouse[]) => {
+    const selectedList = allWh.filter(w => whIds.includes(w.id));
+    if (selectedList.length === 0) {
+      return '📍 Contactez notre service client pour le lieu de retrait.';
+    }
+    const numberEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+    return selectedList.map((w, idx) => {
+      const emoji = numberEmojis[idx] || `${idx + 1}.`;
+      const addr = w.address ? ` : ${w.address}` : '';
+      const phone = w.phone ? ` (Tél : ${w.phone})` : '';
+      return `${emoji} ${w.name}${addr}${phone}`;
+    }).join('\n');
+  };
+
   const loadPreview = async (containerId: string) => {
     if (!containerId) return;
     setLoading(true);
     try {
-      const res = await api.get(`/whatsapp/preview/${containerId}`);
-      setNotifications(res.data.notifications);
-      setSelectedLotIds(res.data.notifications.map((n: NotificationItem) => n.lot_id));
+      const [previewRes, whRes] = await Promise.all([
+        api.get(`/whatsapp/preview/${containerId}`),
+        api.get('/warehouses')
+      ]);
+
+      const currentWarehouses: Warehouse[] = whRes.data.warehouses || [];
+      setWarehouses(currentWarehouses);
+
+      const defaultWhIds = currentWarehouses
+        .filter(w => w.is_default_pickup !== false)
+        .map(w => w.id);
+
+      const initialSelections: Record<number, number[]> = {};
+      const updatedNotifs = (previewRes.data.notifications || []).map((n: NotificationItem) => {
+        initialSelections[n.lot_id] = defaultWhIds;
+
+        const locText = generateLocationsText(defaultWhIds, currentWarehouses);
+        const updatedMsg = n.message.replace(/📍 \*Lieux de retrait disponibles :\*\n[\s\S]*?(?=\n\n|$)/, `📍 *Lieux de retrait disponibles :*\n${locText}`);
+        
+        const cleanPhone = n.client_phone.replace(/\D/g, '');
+        const fullPhone = cleanPhone.startsWith('221') ? cleanPhone : `221${cleanPhone}`;
+        const updatedLink = `https://wa.me/${fullPhone}?text=${encodeURIComponent(updatedMsg)}`;
+
+        return {
+          ...n,
+          message: updatedMsg,
+          wa_link: updatedLink
+        };
+      });
+
+      setClientWarehouseSelection(initialSelections);
+      setNotifications(updatedNotifs);
+      setSelectedLotIds(updatedNotifs.map((n: NotificationItem) => n.lot_id));
     } catch (err) {
       console.error('Erreur prévisualisation:', err);
     } finally {
@@ -144,22 +198,69 @@ export const WhatsAppPage: React.FC = () => {
     }
   };
 
+  const toggleClientWarehouse = (lotId: number, warehouseId: number) => {
+    setClientWarehouseSelection(prev => {
+      const current = prev[lotId] || [];
+      const updatedWhIds = current.includes(warehouseId)
+        ? current.filter(id => id !== warehouseId)
+        : [...current, warehouseId];
+
+      const newSelection = { ...prev, [lotId]: updatedWhIds };
+
+      setNotifications(oldNotifs => oldNotifs.map(n => {
+        if (n.lot_id !== lotId) return n;
+
+        const locText = generateLocationsText(updatedWhIds, warehouses);
+        const updatedMsg = n.message.replace(/📍 \*Lieux de retrait disponibles :\*\n[\s\S]*?(?=\n\n|$)/, `📍 *Lieux de retrait disponibles :*\n${locText}`);
+
+        const cleanPhone = n.client_phone.replace(/\D/g, '');
+        const fullPhone = cleanPhone.startsWith('221') ? cleanPhone : `221${cleanPhone}`;
+        const updatedLink = `https://wa.me/${fullPhone}?text=${encodeURIComponent(updatedMsg)}`;
+
+        return {
+          ...n,
+          message: updatedMsg,
+          wa_link: updatedLink
+        };
+      }));
+
+      return newSelection;
+    });
+  };
+
   const handleSendBulkAuto = async () => {
     const toSend = notifications.filter(n => selectedLotIds.includes(n.lot_id));
     if (toSend.length === 0) return;
+
+    const validToSend = toSend.filter(n => isPhoneValid(n.client_phone));
+    const missingCount = toSend.length - validToSend.length;
+
+    if (validToSend.length === 0) {
+      setFeedbackModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Téléphones Manquants',
+        message: 'Impossible d\'envoyer : aucun des clients sélectionnés ne possède un numéro de téléphone renseigné.'
+      });
+      return;
+    }
 
     setSending(true);
     try {
       const res = await api.post('/whatsapp/send-bulk', {
         containerId: selectedContainerId ? parseInt(selectedContainerId, 10) : null,
-        notifications: toSend
+        notifications: validToSend
       });
+
+      const messageText = missingCount > 0
+        ? `${validToSend.length} notification(s) envoyée(s). Note : ${missingCount} client(s) ignoré(s) car leur numéro de téléphone est manquant.`
+        : res.data.message || `${validToSend.length} notification(s) envoyée(s) avec succès.`;
 
       setFeedbackModal({
         isOpen: true,
         type: 'success',
         title: 'Envoi des Notifications Réussi !',
-        message: res.data.message || `${toSend.length} notification(s) envoyée(s) avec succès.`
+        message: messageText
       });
 
       loadContainersAndLogs();
@@ -362,8 +463,15 @@ export const WhatsAppPage: React.FC = () => {
                     </button>
                     <div>
                       <h4 className="font-extrabold text-base text-foreground">{n.client_name}</h4>
-                      <p className="text-xs text-muted-foreground font-semibold">{n.client_phone}</p>
-                      <span className="inline-block px-2.5 py-0.5 rounded-full bg-secondary text-[11px] font-bold text-foreground mt-1">
+                      {isPhoneValid(n.client_phone) ? (
+                        <p className="text-xs text-muted-foreground font-semibold">{n.client_phone}</p>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/10 text-red-600 border border-red-500/20 text-[11px] font-extrabold mt-0.5">
+                          <AlertCircle className="w-3 h-3" />
+                          <span>N° Téléphone Manquant</span>
+                        </span>
+                      )}
+                      <span className="inline-block px-2.5 py-0.5 rounded-full bg-secondary text-[11px] font-bold text-foreground mt-1 ml-2">
                         {n.product_description}
                       </span>
                     </div>
@@ -372,32 +480,76 @@ export const WhatsAppPage: React.FC = () => {
                   {/* Actions Row avec Bouton "Voir le message" */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
-                      onClick={() => setViewingMessage({ client_name: n.client_name, client_phone: n.client_phone, message: n.message })}
+                      onClick={() => setViewingMessage({ client_name: n.client_name, client_phone: n.client_phone || 'Non renseigné', message: n.message })}
                       className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-secondary hover:bg-border text-xs font-bold text-foreground transition-all"
                     >
                       <Eye className="w-3.5 h-3.5 text-primary" />
                       <span>Voir le message</span>
                     </button>
 
-                    <button
-                      onClick={() => handleSingleAutoSend(n)}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow transition-all"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                      <span>Envoyer 1-Clic</span>
-                    </button>
+                    {isPhoneValid(n.client_phone) ? (
+                      <>
+                        <button
+                          onClick={() => handleSingleAutoSend(n)}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow transition-all"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Envoyer 1-Clic</span>
+                        </button>
 
-                    <a
-                      href={n.wa_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-secondary hover:bg-border text-xs font-bold text-foreground transition-all"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Ouvrir App WhatsApp</span>
-                    </a>
+                        <a
+                          href={n.wa_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-secondary hover:bg-border text-xs font-bold text-foreground transition-all"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Ouvrir App WhatsApp</span>
+                        </a>
+                      </>
+                    ) : (
+                      <span className="px-3 py-1.5 rounded-xl bg-secondary text-muted-foreground text-xs font-bold italic">
+                        ⚠️ Ajoutez un N° dans "Tous les Clients"
+                      </span>
+                    )}
                   </div>
                 </div>
+
+                {/* Sélecteur de Lieux de Retrait par Coche pour ce Client */}
+                {warehouses.length > 0 && (
+                  <div className="mt-3 p-3 rounded-2xl bg-secondary/50 border border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-extrabold text-foreground flex items-center gap-1.5 uppercase tracking-wider">
+                        <MapPin className="w-3.5 h-3.5 text-primary" />
+                        <span>Lieux de retrait à inclure dans le message :</span>
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                      {warehouses.map((w) => {
+                        const isChecked = (clientWarehouseSelection[n.lot_id] || []).includes(w.id);
+                        return (
+                          <label
+                            key={w.id}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer select-none ${
+                              isChecked
+                                ? 'bg-primary/10 border-primary/40 text-primary shadow-sm'
+                                : 'bg-card border-border text-muted-foreground hover:border-primary/20'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleClientWarehouse(n.lot_id, w.id)}
+                              className="w-4 h-4 rounded text-primary border-border focus:ring-primary accent-primary"
+                            />
+                            <span>{w.name} {w.address ? `(${w.address})` : ''}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

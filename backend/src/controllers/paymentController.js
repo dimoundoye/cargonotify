@@ -11,7 +11,32 @@ function getEffectiveCompanyId(req) {
   return (req.user && req.user.company_id) ? req.user.company_id : 1;
 }
 
-// Enregistrer un règlement
+// Assurer les colonnes de snapshot sur la table payments pour l'immutabilité stricte
+async function ensurePaymentSnapshotColumns() {
+  try {
+    await pool.query(`
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS signature_snapshot TEXT;
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS company_name_snapshot VARCHAR(255);
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS company_phone_snapshot VARCHAR(100);
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS company_address_snapshot TEXT;
+
+      -- Figer définitivement les reçus existants sans snapshot avec la signature active actuelle
+      UPDATE payments p
+      SET signature_snapshot = COALESCE(cs.signature_base64, 'NO_SIGNATURE'),
+          company_name_snapshot = cs.company_name,
+          company_phone_snapshot = cs.phone,
+          company_address_snapshot = cs.address
+      FROM company_settings cs
+      WHERE p.company_id = cs.id AND p.signature_snapshot IS NULL;
+    `);
+  } catch (err) {
+    console.error('Erreur migration columns snapshot payments:', err.message);
+  }
+}
+
+ensurePaymentSnapshotColumns().catch(e => console.error('Init snapshot columns failed:', e));
+
+// Enregistrer un règlement (avec figeage 100% immutable du cachet/signature)
 async function createPayment(req, res) {
   const client = await pool.connect();
   try {
@@ -31,14 +56,35 @@ async function createPayment(req, res) {
     }
     const lot = lotQuery.rows[0];
 
+    // Obtenir la signature et le profil de l'entreprise au MOMENT PRÉCIS de la création du reçu
+    const company = await getCompanySettingsData(companyId);
+
     const receiptNumber = `REC-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
 
-    // Créer le paiement
+    // Figer la signature active dans 'signature_snapshot'. Si aucune signature n'est définie, stocker 'NO_SIGNATURE'
+    const signatureSnapshot = company.signature_base64 ? company.signature_base64 : 'NO_SIGNATURE';
+
+    // Créer le paiement avec SNAPSHOT IMMUTABLE
     const paymentResult = await client.query(`
-      INSERT INTO payments (company_id, lot_id, client_id, amount_paid, payment_method, receipt_number, notes)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO payments (
+        company_id, lot_id, client_id, amount_paid, payment_method, receipt_number, notes,
+        signature_snapshot, company_name_snapshot, company_phone_snapshot, company_address_snapshot
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
-    `, [companyId, lot_id, lot.client_id, parseFloat(amount_paid), payment_method || 'cash', receiptNumber, notes || null]);
+    `, [
+      companyId, 
+      lot_id, 
+      lot.client_id, 
+      parseFloat(amount_paid), 
+      payment_method || 'cash', 
+      receiptNumber, 
+      notes || null,
+      signatureSnapshot,
+      company.company_name,
+      company.phone,
+      company.address
+    ]);
 
     const payment = paymentResult.rows[0];
 
@@ -134,7 +180,7 @@ async function getPayments(req, res) {
   }
 }
 
-// Générer le reçu de paiement PDF
+// Générer le reçu de paiement PDF (Lit STRICTEMENT le SNAPSHOT IMMUTABLE du reçu)
 async function generateReceiptPDF(req, res) {
   try {
     const { id } = req.params;
@@ -172,6 +218,24 @@ async function generateReceiptPDF(req, res) {
     const p = paymentQuery.rows[0];
     const noteText = p.notes || p.lot_notes;
 
+    // Déterminer la signature figeée pour ce reçu
+    let effectiveSignature = p.signature_snapshot;
+    
+    // Si c'est un ancien reçu qui n'avait aucun snapshot, figer avec la signature actuelle pour la verrouiller à jamais
+    if (!effectiveSignature) {
+      effectiveSignature = company.signature_base64 || 'NO_SIGNATURE';
+      await pool.query('UPDATE payments SET signature_snapshot = $1 WHERE id = $2', [effectiveSignature, p.id]);
+    }
+
+    // Si le snapshot indique NO_SIGNATURE, ne pas afficher de signature
+    if (effectiveSignature === 'NO_SIGNATURE') {
+      effectiveSignature = null;
+    }
+
+    const effectiveCompanyName = p.company_name_snapshot || company.company_name;
+    const effectivePhone = p.company_phone_snapshot || company.phone;
+    const effectiveAddress = p.company_address_snapshot || company.address;
+
     // Obtenir le cumul payé
     const sumQuery = await pool.query('SELECT COALESCE(SUM(amount_paid), 0) AS total_paid FROM payments WHERE lot_id = $1', [p.lot_id]);
     const totalPaid = parseFloat(sumQuery.rows[0].total_paid);
@@ -187,7 +251,18 @@ async function generateReceiptPDF(req, res) {
     });
     const qrCodeImage = await QRCode.toDataURL(qrPayload);
 
-    // Helpers pour formatage PDF propre (espace standard sans problème de glyphe Unicode & virgule française)
+    // Extraction du Buffer d'image pour la Signature figeée
+    let signatureBuffer = null;
+    if (effectiveSignature && typeof effectiveSignature === 'string' && effectiveSignature.startsWith('data:image')) {
+      try {
+        const base64Clean = effectiveSignature.replace(/^data:image\/\w+;base64,/, '');
+        signatureBuffer = Buffer.from(base64Clean, 'base64');
+      } catch (errSigBuf) {
+        console.error('Erreur conversion signature snapshot vers buffer:', errSigBuf);
+      }
+    }
+
+    // Formatters
     const formatPdfAmount = (val) => {
       const n = Math.round(Number(val) || 0);
       return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -205,10 +280,10 @@ async function generateReceiptPDF(req, res) {
 
     doc.pipe(res);
 
-    // Header dynamique depuis la base de données
-    doc.fillColor('#1E293B').fontSize(18).font('Helvetica-Bold').text(company.company_name, 50, 45);
+    // Header fige depuis le snapshot du reçu
+    doc.fillColor('#1E293B').fontSize(18).font('Helvetica-Bold').text(effectiveCompanyName, 50, 45);
     doc.fontSize(9.5).font('Helvetica').fillColor('#64748B').text('Import-Export, Transit & Dédouanement', 50, 68);
-    doc.text(`${company.address} | Contact: ${company.phone}`, 50, 82);
+    doc.text(`${effectiveAddress} | Contact: ${effectivePhone}`, 50, 82);
 
     doc.moveTo(50, 98).lineTo(545, 98).strokeColor('#E2E8F0').lineWidth(1).stroke();
 
@@ -249,7 +324,7 @@ async function generateReceiptPDF(req, res) {
     doc.font('Helvetica-Bold').fontSize(10).fillColor(remainingBalance > 0 ? '#DC2626' : '#16A34A')
       .text(`${formatPdfAmount(remainingBalance)} ${company.currency}`, 300, 435, { width: 230, align: 'right' });
 
-    // Payment details & QR
+    // Payment details & Notes
     doc.font('Helvetica').fillColor('#475569').fontSize(9)
       .text(`Mode de Règlement : ${p.payment_method.toUpperCase()}`, 50, 480)
       .text(`Date du Règlement : ${new Date(p.payment_date).toLocaleString('fr-FR')}`, 50, 495);
@@ -259,11 +334,28 @@ async function generateReceiptPDF(req, res) {
       doc.font('Helvetica-Oblique').fontSize(8.5).fillColor('#334155').text(noteText, 50, 528, { width: 380 });
     }
 
-    // QR Image
-    doc.image(qrCodeImage, 450, 475, { width: 85 });
+    // --- QR CODE À GAUCHE ---
+    doc.image(qrCodeImage, 50, 560, { width: 80 });
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#64748B').text('Authenticité QR Code', 50, 645);
+
+    // --- CACHET & SIGNATURE FIGÉE À DROITE ---
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor('#1E293B').text('Cachet & Signature Officielle :', 340, 550, { width: 200, align: 'right' });
+
+    if (signatureBuffer) {
+      try {
+        doc.image(signatureBuffer, 395, 565, { width: 130 });
+      } catch (errSigDraw) {
+        console.error('Erreur dessin signature PDFKit:', errSigDraw);
+        doc.rect(385, 568, 140, 65).dash(3, { space: 3 }).strokeColor('#CBD5E1').lineWidth(1).stroke();
+        doc.undash();
+      }
+    } else {
+      doc.rect(385, 568, 140, 65).dash(3, { space: 3 }).strokeColor('#CBD5E1').lineWidth(1).stroke();
+      doc.undash();
+    }
 
     // Footer
-    doc.fontSize(8).fillColor('#94A3B8').text(`Ce reçu est délivré par ${company.company_name}. Gardez ce document pour le retrait de vos colis en entrepôt.`, 50, 720, { align: 'center' });
+    doc.fontSize(8).font('Helvetica').fillColor('#94A3B8').text(`Ce reçu est délivré par ${effectiveCompanyName}. Gardez ce document pour le retrait de vos colis en entrepôt.`, 50, 720, { align: 'center' });
 
     doc.end();
   } catch (err) {
@@ -377,8 +469,8 @@ async function verifyReceiptQR(req, res) {
       }
     });
   } catch (err) {
-    console.error('Erreur verifyReceiptQR:', err);
-    return res.status(500).json({ valid: false, error: 'Erreur lors de la vérification du QR Code.' });
+    console.error('Erreur generateReceiptPDF:', err);
+    return res.status(500).json({ valid: false, error: 'Erreur lors de la génération du PDF.' });
   }
 }
 
