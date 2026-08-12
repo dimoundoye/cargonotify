@@ -95,6 +95,7 @@ ufw allow 22/tcp comment 'SSH'
 
 # Frontend CargoNotify (accessible depuis NPM sur VPS1)
 ufw allow 3000/tcp comment 'CargoNotify Frontend'
+ufw allow 8080/tcp comment 'Dozzle Logs'
 
 # HTTP/HTTPS optionnel si Let's Encrypt vérifie depuis ce VPS
 # ufw allow 80/tcp

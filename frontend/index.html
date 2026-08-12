@@ -19,6 +19,14 @@
   </head>
   <body class="bg-background text-foreground font-sans antialiased">
     <div id="root"></div>
+    <script>
+      // 🛡️ Interception précoce de l'événement PWA avant l'initialisation de React
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredPwaPrompt = e;
+        window.dispatchEvent(new Event('pwa-prompt-ready'));
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

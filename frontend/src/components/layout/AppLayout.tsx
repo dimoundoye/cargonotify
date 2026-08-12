@@ -36,31 +36,76 @@ export const AppLayout: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem('sidebar_collapsed') === 'true';
   });
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(() => (window as any).deferredPwaPrompt || null);
+  const [isStandalone, setIsStandalone] = useState<boolean>(() => {
+    return window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+  });
+  const [isInstalled, setIsInstalled] = useState<boolean>(false);
 
   useEffect(() => {
+    // 🛡️ Détection si l'application est déjà lancée en mode PWA installée
+    const mediaQuery = window.matchMedia('(display-mode: standalone)');
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => setIsStandalone(e.matches);
+    mediaQuery.addEventListener('change', handleDisplayModeChange);
+
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
+      (window as any).deferredPwaPrompt = e;
       setDeferredPrompt(e);
     };
 
+    const handlePwaPromptReady = () => {
+      if ((window as any).deferredPwaPrompt) {
+        setDeferredPrompt((window as any).deferredPwaPrompt);
+      }
+    };
+
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      (window as any).deferredPwaPrompt = null;
+      setDeferredPrompt(null);
+      toast.success("CargoNotify a été installée avec succès sur votre appareil !");
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-prompt-ready', handlePwaPromptReady);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
+      mediaQuery.removeEventListener('change', handleDisplayModeChange);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-prompt-ready', handlePwaPromptReady);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
   const handleInstallPWA = async () => {
-    if (!deferredPrompt) {
-      toast.info("Pour installer l'application sur votre écran d'accueil : appuyez sur le menu du navigateur (ou Partager sur Safari iOS) ➔ 'Ajouter à l'écran d'accueil'.");
+    if (isStandalone || isInstalled) {
+      toast.success("L'application CargoNotify est déjà installée sur cet appareil.");
       return;
     }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-      toast.success("Installation de CargoNotify acceptée !");
+
+    const activePrompt = deferredPrompt || (window as any).deferredPwaPrompt;
+
+    if (!activePrompt) {
+      toast.info(
+        "Pour installer l'application : sur Chrome/Edge, cliquez sur le bouton d'installation dans la barre d'adresse. Sur iPhone (Safari), appuyez sur le bouton Partager ➔ 'Sur l'écran d'accueil'.",
+        { duration: 6000 }
+      );
+      return;
+    }
+
+    try {
+      activePrompt.prompt();
+      const { outcome } = await activePrompt.userChoice;
+      if (outcome === 'accepted') {
+        (window as any).deferredPwaPrompt = null;
+        setDeferredPrompt(null);
+        setIsInstalled(true);
+        toast.success("Installation de CargoNotify acceptée !");
+      }
+    } catch (err) {
+      console.error("[PWA Install Error]", err);
     }
   };
 
@@ -236,14 +281,16 @@ export const AppLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleInstallPWA}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all text-xs font-bold shadow-sm"
-              title="Installer l'application sur cet appareil"
-            >
-              <Download className="w-4 h-4 animate-bounce shrink-0" />
-              <span className="text-[11px] sm:text-xs font-extrabold whitespace-nowrap">Installer l'App</span>
-            </button>
+            {!isStandalone && !isInstalled && (
+              <button
+                onClick={handleInstallPWA}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-xl border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all text-xs font-bold shadow-sm"
+                title="Installer l'application sur cet appareil"
+              >
+                <Download className="w-4 h-4 animate-bounce shrink-0" />
+                <span className="text-[11px] sm:text-xs font-extrabold whitespace-nowrap">Installer l'App</span>
+              </button>
+            )}
 
             <button
               onClick={toggleTheme}
@@ -311,16 +358,18 @@ export const AppLayout: React.FC = () => {
                   );
                 })}
 
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    handleInstallPWA();
-                  }}
-                  className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-extrabold text-xs bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white transition-all shadow-sm"
-                >
-                  <Download className="w-4 h-4 animate-bounce" />
-                  <span>Installer l'App sur Mobile</span>
-                </button>
+                {!isStandalone && !isInstalled && (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleInstallPWA();
+                    }}
+                    className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl font-extrabold text-xs bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white transition-all shadow-sm"
+                  >
+                    <Download className="w-4 h-4 animate-bounce" />
+                    <span>Installer l'App sur Mobile</span>
+                  </button>
+                )}
               </nav>
 
               {/* Carte Utilisateur Mobile */}

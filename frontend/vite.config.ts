@@ -8,8 +8,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
-      includeAssets: ['favicon.svg', 'manifest.json', 'sw.js'],
+      injectRegister: false,
+      includeAssets: ['favicon.svg', 'manifest.json', 'sw.js', 'android-chrome-192x192.png', 'android-chrome-512x512.png'],
       manifest: {
         name: 'CargoNotify — Transit & Logistique',
         short_name: 'CargoNotify',
@@ -21,16 +21,16 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: '/favicon.svg',
-            sizes: '48x48 72x72 96x96 128x128 256x256 512x512',
-            type: 'image/svg+xml',
+            src: '/android-chrome-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
             purpose: 'any'
           },
           {
-            src: '/favicon.svg',
-            sizes: '192x192 512x512',
-            type: 'image/svg+xml',
-            purpose: 'maskable'
+            src: '/android-chrome-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
           }
         ]
       },
