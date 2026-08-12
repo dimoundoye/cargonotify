@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS users (
     role VARCHAR(50) DEFAULT 'admin',
     warehouse_id INT REFERENCES warehouses(id) ON DELETE SET NULL,
     allowed_tabs JSONB DEFAULT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

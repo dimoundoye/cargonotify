@@ -7,6 +7,9 @@ const { getCompanySettingsData } = require('./settingsController');
 // Assurer l'existence du compte Super Administrateur de l'Application au démarrage
 async function ensureSuperAdminUser() {
   try {
+    // 🛡️ S'assurer que la colonne is_active existe sur la table users
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;");
+
     const initialPass = process.env.INITIAL_SUPERADMIN_PASSWORD || process.env.DB_PASS || 'Passer@2026#';
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(initialPass, salt);
