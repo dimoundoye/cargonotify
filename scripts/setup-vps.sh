@@ -22,7 +22,7 @@ log_error()   { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 # ── Variables ───────────────────────────────────────────────────
 DEPLOY_USER="deploy"
 APP_DIR="/opt/cargonotify"
-GITHUB_REPO="https://github.com/VOTRE_USERNAME/CargoNotify.git"  # ← à modifier
+GITHUB_REPO="https://github.com/dimoundoye/cargonotify.git"
 
 # ═══════════════════════════════════════════════════════════════
 log_info "═══ Étape 1/7 : Mise à jour du système ═══"
@@ -42,7 +42,9 @@ if id "$DEPLOY_USER" &>/dev/null; then
 else
     adduser --disabled-password --gecos "" "$DEPLOY_USER"
     usermod -aG sudo "$DEPLOY_USER"
-    log_success "Utilisateur '$DEPLOY_USER' créé."
+    echo "$DEPLOY_USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$DEPLOY_USER
+    chmod 440 /etc/sudoers.d/$DEPLOY_USER
+    log_success "Utilisateur '$DEPLOY_USER' créé avec accès sudo NOPASSWD."
 fi
 
 # Créer le dossier SSH pour le user deploy
@@ -80,7 +82,7 @@ sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' $SSH_CONFIG
 # Désactiver l'auth par clé host
 sed -i 's/^#\?ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/' $SSH_CONFIG
 
-systemctl restart sshd
+systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
 log_success "SSH sécurisé (root désactivé, password auth désactivé)."
 
 # ═══════════════════════════════════════════════════════════════
@@ -144,14 +146,15 @@ fi
 log_info "═══ Étape 7/7 : Clonage du projet ═══"
 # ═══════════════════════════════════════════════════════════════
 mkdir -p $APP_DIR
-chown $DEPLOY_USER:$DEPLOY_USER $APP_DIR
 
 if [ -d "$APP_DIR/.git" ]; then
     log_warning "Projet déjà cloné dans $APP_DIR."
 else
-    sudo -u $DEPLOY_USER git clone "$GITHUB_REPO" "$APP_DIR"
+    git clone "$GITHUB_REPO" "$APP_DIR"
     log_success "Projet cloné dans $APP_DIR."
 fi
+
+chown -R $DEPLOY_USER:$DEPLOY_USER $APP_DIR
 
 # Créer le .env depuis le template
 if [ ! -f "$APP_DIR/.env" ]; then
