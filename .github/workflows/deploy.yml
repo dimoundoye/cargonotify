@@ -1,0 +1,97 @@
+name: 🚀 Deploy CargoNotify
+
+on:
+  push:
+    branches:
+      - main
+
+  # Permet de déclencher manuellement depuis l'onglet Actions
+  workflow_dispatch:
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Job 1 : Vérification du build (frontend + backend)
+  # ─────────────────────────────────────────────────────────────
+  build:
+    name: 🔨 Build & Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout du code
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: 📦 Installer dépendances Backend
+        working-directory: ./backend
+        run: npm ci --omit=dev
+
+      - name: 📦 Installer dépendances Frontend
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: 🏗️ Build Frontend (Vite)
+        working-directory: ./frontend
+        env:
+          VITE_API_URL: /api
+        run: npm run build
+
+      - name: ✅ Build réussi
+        run: echo "Build frontend et backend OK"
+
+  # ─────────────────────────────────────────────────────────────
+  # Job 2 : Déploiement sur VPS2 (après build OK)
+  # ─────────────────────────────────────────────────────────────
+  deploy:
+    name: 🚀 Deploy sur VPS
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: 📥 Checkout du code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Déploiement via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            set -e
+
+            echo "📁 Navigation vers le projet..."
+            cd /opt/cargonotify
+
+            echo "⬇️  Pull des dernières modifications..."
+            git pull origin main
+
+            echo "🐳 Rebuild et redémarrage des containers..."
+            docker compose up -d --build --remove-orphans
+
+            echo "🧹 Nettoyage des images Docker inutilisées..."
+            docker image prune -f
+
+            echo "📊 État des containers..."
+            docker compose ps
+
+            echo "🏥 Health check..."
+            sleep 10
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Health check OK (HTTP $STATUS)"
+            else
+              echo "❌ Health check FAILED (HTTP $STATUS)"
+              docker compose logs --tail=50 backend
+              exit 1
+            fi
+
+            echo "🎉 Déploiement CargoNotify terminé avec succès !"

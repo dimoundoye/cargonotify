@@ -1,0 +1,8 @@
+node_modules/
+.env
+whatsapp_sessions/
+*.log
+npm-debug.log*
+.npm
+.DS_Store
+Thumbs.db
