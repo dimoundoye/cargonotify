@@ -318,124 +318,129 @@ export const ScannerQRPage: React.FC = () => {
 
       {/* Main Container */}
       <div className="p-6 rounded-3xl bg-card border border-border shadow-md space-y-6">
-        {/* TAB 1: CAMERA SCAN */}
-        {activeTab === 'camera' && (
-          <div className="space-y-6">
-            {!cameraRequested ? (
-              /* Custom Elegant Pre-Access Hero Card */
-              <div className="p-8 rounded-3xl bg-secondary/40 border border-border text-center space-y-5 max-w-lg mx-auto">
-                <div className="p-4 rounded-3xl bg-primary/10 text-primary w-fit mx-auto">
-                  <Camera className="w-10 h-10" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-base font-black text-foreground">Démarrer le Scanner Caméra CargoNotify</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Cliquez sur le bouton ci-dessous pour autoriser la caméra et scanner le QR Code imprimé sur le reçu client.
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => setCameraRequested(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-black text-xs shadow-lg hover:bg-primary/90 transition-all transform hover:scale-[1.02]"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  <span>Activer la Caméra</span>
-                </button>
-              </div>
-            ) : (
-              /* Active Camera Stream Viewfinder */
-              <div className="space-y-4 text-center">
-                {cameraError ? (
-                  <div className="p-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-semibold space-y-3 max-w-md mx-auto">
-                    <AlertTriangle className="w-8 h-8 mx-auto" />
-                    <p>{cameraError}</p>
-                    <button
-                      onClick={() => setCameraRequested(false)}
-                      className="px-4 py-2 rounded-xl bg-red-600 text-white font-bold text-xs shadow hover:bg-red-700 transition-all"
-                    >
-                      Fermer & Réessayer
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="relative max-w-sm mx-auto aspect-square rounded-3xl overflow-hidden bg-slate-950 border-2 border-primary/40 shadow-xl flex items-center justify-center">
-                      <video ref={videoRef} className="w-full h-full object-cover" />
-                      <canvas ref={canvasRef} className="hidden" />
-
-                      {/* Viewfinder Frame */}
-                      {isCameraActive && (
-                        <div className="absolute inset-0 border-[40px] border-slate-950/60 flex items-center justify-center">
-                          <div className="w-48 h-48 border-2 border-primary border-dashed rounded-2xl animate-pulse relative">
-                            <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-primary"></div>
-                            <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-primary"></div>
-                            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-primary"></div>
-                            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-primary"></div>
-                          </div>
-                        </div>
-                      )}
+        {/* Afficher l'interface de scan uniquement si aucun résultat n'est présent */}
+        {!scanResult && !verifying && (
+          <>
+            {/* TAB 1: CAMERA SCAN */}
+            {activeTab === 'camera' && (
+              <div className="space-y-6">
+                {!cameraRequested ? (
+                  /* Custom Elegant Pre-Access Hero Card */
+                  <div className="p-8 rounded-3xl bg-secondary/40 border border-border text-center space-y-5 max-w-lg mx-auto">
+                    <div className="p-4 rounded-3xl bg-primary/10 text-primary w-fit mx-auto">
+                      <Camera className="w-10 h-10" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-base font-black text-foreground">Démarrer le Scanner Caméra CargoNotify</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Cliquez sur le bouton ci-dessous pour autoriser la caméra et scanner le QR Code imprimé sur le reçu client.
+                      </p>
                     </div>
 
                     <button
-                      onClick={() => setCameraRequested(false)}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary border border-border text-foreground font-extrabold text-xs hover:bg-destructive hover:text-destructive-foreground transition-all"
+                      onClick={() => setCameraRequested(true)}
+                      className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-primary text-primary-foreground font-black text-xs shadow-lg hover:bg-primary/90 transition-all transform hover:scale-[1.02]"
                     >
-                      <StopCircle className="w-4 h-4" />
-                      <span>Arrêter la Caméra</span>
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Activer la Caméra</span>
                     </button>
+                  </div>
+                ) : (
+                  /* Active Camera Stream Viewfinder */
+                  <div className="space-y-4 text-center">
+                    {cameraError ? (
+                      <div className="p-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-semibold space-y-3 max-w-md mx-auto">
+                        <AlertTriangle className="w-8 h-8 mx-auto" />
+                        <p>{cameraError}</p>
+                        <button
+                          onClick={() => setCameraRequested(false)}
+                          className="px-4 py-2 rounded-xl bg-red-600 text-white font-bold text-xs shadow hover:bg-red-700 transition-all"
+                        >
+                          Fermer & Réessayer
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="relative max-w-sm mx-auto aspect-square rounded-3xl overflow-hidden bg-slate-950 border-2 border-primary/40 shadow-xl flex items-center justify-center">
+                          <video ref={videoRef} className="w-full h-full object-cover" />
+                          <canvas ref={canvasRef} className="hidden" />
+
+                          {/* Viewfinder Frame */}
+                          {isCameraActive && (
+                            <div className="absolute inset-0 border-[40px] border-slate-950/60 flex items-center justify-center">
+                              <div className="w-48 h-48 border-2 border-primary border-dashed rounded-2xl animate-pulse relative">
+                                <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-primary"></div>
+                                <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-primary"></div>
+                                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-primary"></div>
+                                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-primary"></div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => setCameraRequested(false)}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary border border-border text-foreground font-extrabold text-xs hover:bg-destructive hover:text-destructive-foreground transition-all"
+                        >
+                          <StopCircle className="w-4 h-4" />
+                          <span>Arrêter la Caméra</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* TAB 2: UPLOAD FILE (PDF / IMAGE) */}
-        {activeTab === 'upload' && (
-          <div className="p-8 border-2 border-dashed border-border rounded-3xl text-center space-y-4 hover:border-primary transition-colors cursor-pointer bg-secondary/30">
-            <input
-              type="file"
-              accept="application/pdf,image/*"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="qr-file-input"
-            />
-            <label htmlFor="qr-file-input" className="cursor-pointer space-y-3 block">
-              <div className="p-4 rounded-2xl bg-primary/10 text-primary w-fit mx-auto">
-                <FileType className="w-8 h-8" />
-              </div>
-              <div>
-                <h3 className="text-sm font-extrabold text-foreground">Cliquez ici pour charger un reçu (Fichier PDF ou Image)</h3>
-                <p className="text-xs text-muted-foreground mt-1">Formats acceptés : PDF (.pdf), PNG, JPG, JPEG, WEBP</p>
-              </div>
-            </label>
-          </div>
-        )}
-
-        {/* TAB 3: MANUAL INPUT */}
-        {activeTab === 'manual' && (
-          <form onSubmit={handleManualSubmit} className="max-w-md mx-auto space-y-4">
-            <div>
-              <label className="block text-xs font-semibold mb-1">Numéro de Reçu Officiel (ex: REC-2026-0001) *</label>
-              <div className="relative">
-                <FileText className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            {/* TAB 2: UPLOAD FILE (PDF / IMAGE) */}
+            {activeTab === 'upload' && (
+              <div className="p-8 border-2 border-dashed border-border rounded-3xl text-center space-y-4 hover:border-primary transition-colors cursor-pointer bg-secondary/30">
                 <input
-                  type="text"
-                  required
-                  placeholder="Saisissez ou collez le N° de reçu..."
-                  value={manualCode}
-                  onChange={(e) => setManualCode(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-secondary border border-border rounded-xl font-extrabold text-sm focus:outline-none focus:ring-2 focus:ring-primary uppercase"
+                  type="file"
+                  accept="application/pdf,image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="qr-file-input"
                 />
+                <label htmlFor="qr-file-input" className="cursor-pointer space-y-3 block">
+                  <div className="p-4 rounded-2xl bg-primary/10 text-primary w-fit mx-auto">
+                    <FileType className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-foreground">Cliquez ici pour charger un reçu (Fichier PDF ou Image)</h3>
+                    <p className="text-xs text-muted-foreground mt-1">Formats acceptés : PDF (.pdf), PNG, JPG, JPEG, WEBP</p>
+                  </div>
+                </label>
               </div>
-            </div>
-            <button
-              type="submit"
-              disabled={verifying || !manualCode.trim()}
-              className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-md hover:bg-primary/90 transition-all disabled:opacity-50"
-            >
-              {verifying ? 'Vérification en cours...' : 'Vérifier ce Reçu'}
-            </button>
-          </form>
+            )}
+
+            {/* TAB 3: MANUAL INPUT */}
+            {activeTab === 'manual' && (
+              <form onSubmit={handleManualSubmit} className="max-w-md mx-auto space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-1">Numéro de Reçu Officiel (ex: REC-2026-0001) *</label>
+                  <div className="relative">
+                    <FileText className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="Saisissez ou collez le N° de reçu..."
+                      value={manualCode}
+                      onChange={(e) => setManualCode(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2.5 bg-secondary border border-border rounded-xl font-extrabold text-sm focus:outline-none focus:ring-2 focus:ring-primary uppercase"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={verifying || !manualCode.trim()}
+                  className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-md hover:bg-primary/90 transition-all disabled:opacity-50"
+                >
+                  {verifying ? 'Vérification en cours...' : 'Vérifier ce Reçu'}
+                </button>
+              </form>
+            )}
+          </>
         )}
 
         {/* Loading Spinner */}
@@ -557,7 +562,7 @@ export const ScannerQRPage: React.FC = () => {
                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border font-bold text-xs hover:bg-secondary transition-all"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Nouveau Scan</span>
+                    <span>Effectuer un autre scan</span>
                   </button>
                 </div>
               </div>
@@ -580,7 +585,7 @@ export const ScannerQRPage: React.FC = () => {
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 text-white font-bold text-xs shadow hover:bg-red-700 transition-all"
                   >
                     <RefreshCw className="w-4 h-4" />
-                    <span>Réessayer un autre Scan</span>
+                    <span>Effectuer un autre scan</span>
                   </button>
                 </div>
               </div>
