@@ -6,7 +6,7 @@ async function ensureTablesAndColumns() {
     CREATE TABLE IF NOT EXISTS company_settings (
       id INT PRIMARY KEY DEFAULT 1,
       company_name VARCHAR(255) NOT NULL DEFAULT 'CargoNotify Transit & Logistique',
-      phone VARCHAR(100) NOT NULL DEFAULT '+221 77 872 16 15',
+      phone VARCHAR(100) NOT NULL DEFAULT '+221',
       email VARCHAR(255) NOT NULL DEFAULT 'contact@cargonotify.sn',
       address TEXT NOT NULL DEFAULT 'Dakar, Sénégal',
       currency VARCHAR(50) NOT NULL DEFAULT 'FCFA',
@@ -17,7 +17,7 @@ async function ensureTablesAndColumns() {
     );
 
     INSERT INTO company_settings (id, company_name, phone, email, address, currency)
-    VALUES (1, 'CargoNotify Transit & Logistique', '+221 77 872 16 15', 'contact@cargonotify.sn', 'Dakar, Sénégal', 'FCFA')
+    VALUES (1, 'CargoNotify Transit & Logistique', '+221', 'contact@cargonotify.sn', 'Dakar, Sénégal', 'FCFA')
     ON CONFLICT (id) DO NOTHING;
 
     ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS maintenance_mode BOOLEAN DEFAULT FALSE;
@@ -30,17 +30,39 @@ async function ensureTablesAndColumns() {
 
 ensureTablesAndColumns().catch(err => console.error('Erreur init DB settings:', err));
 
-// Helper d'accès direct au profil et statut maintenance
-async function getCompanySettingsData() {
+// Helper d'accès direct au profil et statut maintenance par entreprise
+async function getCompanySettingsData(companyId = 1) {
   try {
-    const res = await pool.query('SELECT * FROM company_settings WHERE id = 1');
-    if (res.rows.length > 0) return res.rows[0];
+    const targetCompanyId = companyId || 1;
+
+    // 1. Récupérer les infos officielles de l'entreprise depuis la table `companies`
+    const compRes = await pool.query('SELECT * FROM companies WHERE id = $1', [targetCompanyId]);
+    const company = compRes.rows[0];
+
+    // 2. Récupérer la configuration additionnelle (cachet, maintenance) depuis `company_settings`
+    const settingsRes = await pool.query('SELECT * FROM company_settings WHERE id = $1', [targetCompanyId]);
+    const settings = settingsRes.rows[0] || {};
+
+    if (company || settings.company_name) {
+      return {
+        id: targetCompanyId,
+        company_name: (company && company.name) || settings.company_name || 'CargoNotify Transit & Logistique',
+        phone: (company && company.phone) || settings.phone || '+221',
+        email: (company && company.email) || settings.email || 'contact@cargonotify.sn',
+        address: (company && company.address) || settings.address || 'Dakar, Sénégal',
+        currency: (company && company.currency) || settings.currency || 'FCFA',
+        maintenance_mode: settings.maintenance_mode || false,
+        maintenance_message: settings.maintenance_message || 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !',
+        signature_base64: settings.signature_base64 || null
+      };
+    }
   } catch (e) {
     console.error('Erreur getCompanySettingsData:', e);
   }
   return {
+    id: companyId || 1,
     company_name: 'CargoNotify Transit & Logistique',
-    phone: '+221 77 872 16 15',
+    phone: '+221',
     email: 'contact@cargonotify.sn',
     address: 'Dakar, Sénégal',
     currency: 'FCFA',
@@ -53,7 +75,8 @@ async function getCompanySettingsData() {
 // Route API: Obtenir le profil de l'entreprise & statut système
 async function getCompanySettings(req, res) {
   try {
-    const data = await getCompanySettingsData();
+    const companyId = req.user?.company_id || 1;
+    const data = await getCompanySettingsData(companyId);
     return res.json({ settings: data });
   } catch (err) {
     console.error('Erreur getCompanySettings:', err);
@@ -64,11 +87,26 @@ async function getCompanySettings(req, res) {
 // Route API: Mettre à jour le profil & Cachet/Signature (Admin)
 async function updateCompanySettings(req, res) {
   try {
+    const companyId = req.user?.company_id || 1;
     const { company_name, phone, email, address, currency, maintenance_mode, maintenance_message, signature_base64 } = req.body;
 
+    // 1. Mettre à jour la table principale des entreprises `companies`
+    if (company_name) {
+      await pool.query(`
+        UPDATE companies
+        SET name = COALESCE($1, name),
+            phone = COALESCE($2, phone),
+            email = COALESCE($3, email),
+            address = COALESCE($4, address),
+            currency = COALESCE($5, currency)
+        WHERE id = $6
+      `, [company_name, phone, email, address, currency, companyId]);
+    }
+
+    // 2. Mettre à jour la table des paramètres additionnels `company_settings`
     const result = await pool.query(`
       INSERT INTO company_settings (id, company_name, phone, email, address, currency, maintenance_mode, maintenance_message, signature_base64, updated_at)
-      VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE
       SET company_name = COALESCE(EXCLUDED.company_name, company_settings.company_name),
           phone = COALESCE(EXCLUDED.phone, company_settings.phone),
@@ -81,8 +119,9 @@ async function updateCompanySettings(req, res) {
           updated_at = CURRENT_TIMESTAMP
       RETURNING *
     `, [
+      companyId,
       company_name || 'CargoNotify Transit & Logistique',
-      phone || '+221 77 872 16 15',
+      phone || '+221',
       email || 'contact@cargonotify.sn',
       address || 'Dakar, Sénégal',
       currency || 'FCFA',
@@ -91,7 +130,8 @@ async function updateCompanySettings(req, res) {
       signature_base64 || null
     ]);
 
-    return res.json({ settings: result.rows[0], message: 'Paramètres enregistrés avec succès !' });
+    const updatedData = await getCompanySettingsData(companyId);
+    return res.json({ settings: updatedData, message: 'Paramètres enregistrés avec succès !' });
   } catch (err) {
     console.error('Erreur updateCompanySettings:', err);
     return res.status(500).json({ error: 'Erreur lors de l’enregistrement des paramètres.' });

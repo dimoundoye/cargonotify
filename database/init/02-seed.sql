@@ -8,7 +8,7 @@ INSERT INTO companies (id, name, phone, email, address, currency)
 VALUES (
     1,
     'CargoNotify Transit & Logistique',
-    '+221 77 872 16 15',
+    '+221',
     'contact@cargonotify.com',
     'Dakar, Sénégal',
     'FCFA'

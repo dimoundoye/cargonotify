@@ -14,7 +14,7 @@ async function initDatabase() {
     await client.query(sql);
 
     const companyName = process.env.COMPANY_NAME || 'CargoNotify Transit & Logistique';
-    const companyPhone = process.env.COMPANY_PHONE || '+221 77 872 16 15';
+    const companyPhone = process.env.COMPANY_PHONE || '+221';
     const companyEmail = process.env.COMPANY_EMAIL || 'contact@cargonotify.sn';
     const companyAddress = process.env.COMPANY_ADDRESS || 'Dakar, Sénégal';
     const companyCurrency = process.env.COMPANY_CURRENCY || 'FCFA';

@@ -409,7 +409,7 @@ export const SettingsPage: React.FC = () => {
                       <input
                         type="text"
                         required
-                        placeholder="Ex: +221 77 872 16 15"
+                        placeholder="Ex: +221 77 000 00 00"
                         value={companyPhone}
                         onChange={(e) => setCompanyPhone(e.target.value)}
                         className="w-full pl-9 pr-3.5 py-2.5 bg-secondary border border-border rounded-xl font-bold"
