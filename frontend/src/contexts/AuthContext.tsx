@@ -13,7 +13,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000; // 1 heure (60 minutes)
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -58,7 +58,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, [token]);
 
-  // Déconnexion automatique après 5 minutes d'inactivité (persistant & robuste)
+  // Déconnexion automatique après 1 heure d'inactivité (persistant & robuste)
   useEffect(() => {
     if (!token || !user) return;
 
@@ -83,11 +83,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const checkInactivity = () => {
       const lastAct = Number(sessionStorage.getItem('cargo_notify_last_activity'));
       if (lastAct && Date.now() - lastAct >= INACTIVITY_TIMEOUT_MS) {
-        logout("Session expirée. Veuillez vous reconnecter.");
+        logout("Session expirée après 1 heure d'inactivité. Veuillez vous reconnecter.");
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkInactivity();
       }
     };
 
     window.addEventListener('focus', checkInactivity);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     const checkInterval = setInterval(checkInactivity, 4000);
 
     return () => {
@@ -95,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         window.removeEventListener(event, updateActivity);
       });
       window.removeEventListener('focus', checkInactivity);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       clearInterval(checkInterval);
     };
   }, [token, user]);
