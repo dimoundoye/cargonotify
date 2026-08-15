@@ -138,6 +138,13 @@ export const LotsPage: React.FC = () => {
 
   const calculatedSuggestedAmount = cbmComponent + baleComponent + copyComponent + smallPackingComponent + heavyGoodsComponent;
 
+  const editCbmComponent = (parseFloat(editVolumeCbm) || 0) * cbmRate;
+  const editBaleComponent = (parseInt(editBaleQty, 10) || 0) * baleRate;
+  const editCopyComponent = (parseFloat(editCopyQty) || 0) * copyRate;
+  const editSmallPackingComponent = (parseInt(editSmallPackingQty, 10) || 0) * smallPackingRate;
+  const editHeavyGoodsComponent = (parseFloat(editHeavyGoodsQty) || 0) * heavyGoodsRate;
+  const editCalculatedSuggestedAmount = editCbmComponent + editBaleComponent + editCopyComponent + editSmallPackingComponent + editHeavyGoodsComponent;
+
   const handleCreateLot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedContainerId || !selectedClientId || !productDescription) return;
@@ -203,7 +210,7 @@ export const LotsPage: React.FC = () => {
     setEditSubmitting(true);
 
     try {
-      const finalAmt = parseFloat(editFinalAmount) || 0;
+      const finalAmt = editFinalAmount !== '' ? parseFloat(editFinalAmount) : editCalculatedSuggestedAmount;
       await api.put(`/lots/${editingLot.id}`, {
         product_description: editProductDescription,
         quantity: parseInt(editQuantity, 10) || 1,
@@ -762,15 +769,24 @@ export const LotsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block font-semibold mb-1">Montant Final Facturé (FCFA)</label>
-                <input
-                  type="number"
-                  required
-                  value={editFinalAmount}
-                  onChange={(e) => setEditFinalAmount(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-extrabold text-foreground text-sm focus:ring-2 focus:ring-primary focus:outline-none"
-                />
+              <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20 space-y-2">
+                <div className="flex items-center justify-between font-semibold">
+                  <span>Calcul Automatique Suggéré :</span>
+                  <span className="text-base font-black text-primary">{formatFCFA(editCalculatedSuggestedAmount)}</span>
+                </div>
+
+                <div className="pt-2 border-t border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <label className="font-bold text-foreground">
+                    Montant Final Négocié (FCFA) :
+                  </label>
+                  <input
+                    type="number"
+                    placeholder={`Ex: ${editCalculatedSuggestedAmount}`}
+                    value={editFinalAmount}
+                    onChange={(e) => setEditFinalAmount(e.target.value)}
+                    className="px-3 py-2 bg-card border border-primary/30 rounded-xl font-extrabold text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary w-full sm:w-48 text-right"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
