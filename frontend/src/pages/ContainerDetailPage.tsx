@@ -3,6 +3,7 @@ import { SearchableSelect } from '../components/ui/SearchableSelect';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import { toast } from 'sonner';
 import { Container, ContainerCost, Lot, Client } from '../types';
 import { formatFCFA, formatDate } from '../lib/utils';
 import { 
@@ -100,6 +101,70 @@ export const ContainerDetailPage: React.FC = () => {
   const [manualAmount, setManualAmount] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [submittingLot, setSubmittingLot] = useState(false);
+
+  // Edit Lot State
+  const [editingLot, setEditingLot] = useState<Lot | null>(null);
+  const [editProductDescription, setEditProductDescription] = useState('');
+  const [editQuantity, setEditQuantity] = useState('1');
+  const [editWeightKg, setEditWeightKg] = useState('0');
+  const [editVolumeCbm, setEditVolumeCbm] = useState('0');
+  const [editBaleQty, setEditBaleQty] = useState('0');
+  const [editCopyQty, setEditCopyQty] = useState('0');
+  const [editSmallPackingQty, setEditSmallPackingQty] = useState('0');
+  const [editHeavyGoodsQty, setEditHeavyGoodsQty] = useState('0');
+  const [editFinalAmount, setEditFinalAmount] = useState('0');
+  const [editNotes, setEditNotes] = useState('');
+  const [editPaymentStatus, setEditPaymentStatus] = useState<'unpaid' | 'partial' | 'paid'>('unpaid');
+  const [editPickupStatus, setEditPickupStatus] = useState<'pending' | 'picked_up'>('pending');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+
+  const handleOpenEditLot = (lot: Lot) => {
+    setEditingLot(lot);
+    setEditProductDescription(lot.product_description || '');
+    setEditQuantity(String(lot.quantity || 1));
+    setEditWeightKg(String(lot.weight_kg || 0));
+    setEditVolumeCbm(String(lot.volume_cbm || 0));
+    setEditBaleQty(String(lot.bale_qty || 0));
+    setEditCopyQty(String(lot.copy_qty || 0));
+    setEditSmallPackingQty(String(lot.small_packing_qty || 0));
+    setEditHeavyGoodsQty(String(lot.heavy_goods_qty || 0));
+    setEditFinalAmount(String(lot.final_amount || 0));
+    setEditNotes(lot.notes || '');
+    setEditPaymentStatus(lot.payment_status);
+    setEditPickupStatus(lot.pickup_status);
+  };
+
+  const handleSaveEditLot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLot) return;
+    setEditSubmitting(true);
+
+    try {
+      const finalAmt = parseFloat(editFinalAmount) || 0;
+      await api.put(`/lots/${editingLot.id}`, {
+        product_description: editProductDescription,
+        quantity: parseInt(editQuantity, 10) || 1,
+        weight_kg: parseFloat(editWeightKg) || 0,
+        volume_cbm: parseFloat(editVolumeCbm) || 0,
+        bale_qty: parseInt(editBaleQty, 10) || 0,
+        copy_qty: parseFloat(editCopyQty) || 0,
+        small_packing_qty: parseInt(editSmallPackingQty, 10) || 0,
+        heavy_goods_qty: parseInt(editHeavyGoodsQty) || 0,
+        final_amount: finalAmt,
+        manual_final_amount: finalAmt,
+        notes: editNotes || null,
+        payment_status: editPaymentStatus,
+        pickup_status: editPickupStatus
+      });
+
+      setEditingLot(null);
+      loadContainer();
+    } catch (err) {
+      console.error('Erreur modification lot:', err);
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
 
   // New Client Inline Form State
   const [isNewClientModal, setIsNewClientModal] = useState(false);
@@ -617,13 +682,22 @@ export const ContainerDetailPage: React.FC = () => {
                         </span>
                       </td>
                       <td className="p-3 text-center">
-                        <button
-                          onClick={() => setDeletingLot(lot)}
-                          className="p-1 rounded-lg hover:bg-red-600 hover:text-white text-red-500 transition-colors"
-                          title="Supprimer ce lot"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handleOpenEditLot(lot)}
+                            className="p-1.5 rounded-lg bg-secondary hover:bg-primary hover:text-white text-muted-foreground transition-colors"
+                            title="Modifier ce lot client"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingLot(lot)}
+                            className="p-1.5 rounded-lg bg-secondary hover:bg-red-600 hover:text-white text-red-500 transition-colors"
+                            title="Supprimer ce lot"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1024,6 +1098,177 @@ export const ContainerDetailPage: React.FC = () => {
             >
               Fermer & Rectifier le Numéro
             </button>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* Modal Modification Lot avec React Portal */}
+      {editingLot && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-extrabold flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-primary" />
+                <span>Modifier le Lot Client</span>
+              </h2>
+              <button
+                onClick={() => setEditingLot(null)}
+                className="p-1 rounded-lg hover:bg-secondary text-muted-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditLot} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold mb-1">Description des Marchandises</label>
+                <input
+                  type="text"
+                  required
+                  value={editProductDescription}
+                  onChange={(e) => setEditProductDescription(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-medium focus:ring-2 focus:ring-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">PKGS (Colis)</label>
+                  <input
+                    type="number"
+                    value={editQuantity}
+                    onChange={(e) => setEditQuantity(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Volume (CBM)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editVolumeCbm}
+                    onChange={(e) => setEditVolumeCbm(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold text-primary focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1">Poids (Kg)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editWeightKg}
+                    onChange={(e) => setEditWeightKg(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1 text-[11px] truncate">BALES (Qty)</label>
+                  <input
+                    type="number"
+                    value={editBaleQty}
+                    onChange={(e) => setEditBaleQty(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-[11px] truncate">COPY (Qty)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editCopyQty}
+                    onChange={(e) => setEditCopyQty(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-[11px] truncate">SACS (Qty)</label>
+                  <input
+                    type="number"
+                    value={editSmallPackingQty}
+                    onChange={(e) => setEditSmallPackingQty(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold mb-1 text-[11px] truncate" title="Marchandises Lourdes (Qty)">LOURDES (Qty)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editHeavyGoodsQty}
+                    onChange={(e) => setEditHeavyGoodsQty(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1">Montant Final Facturé (FCFA)</label>
+                <input
+                  type="number"
+                  required
+                  value={editFinalAmount}
+                  onChange={(e) => setEditFinalAmount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-extrabold text-foreground text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold mb-1">Statut Paiement</label>
+                  <select
+                    value={editPaymentStatus}
+                    onChange={(e: any) => setEditPaymentStatus(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold focus:ring-2 focus:ring-primary focus:outline-none"
+                  >
+                    <option value="unpaid">En Attente</option>
+                    <option value="partial">Partiel</option>
+                    <option value="paid">Soldé (OK)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold mb-1">Statut Retrait</label>
+                  <select
+                    value={editPickupStatus}
+                    onChange={(e: any) => setEditPickupStatus(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold focus:ring-2 focus:ring-primary focus:outline-none"
+                  >
+                    <option value="pending">En Attente de Retrait</option>
+                    <option value="picked_up">Marchandise Retirée</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1">Notes</label>
+                <textarea
+                  rows={2}
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none"
+                ></textarea>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setEditingLot(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold hover:bg-secondary"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSubmitting}
+                  className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold shadow hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {editSubmitting ? 'Enregistrement...' : 'Enregistrer'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>,
         document.body

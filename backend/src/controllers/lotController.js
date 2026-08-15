@@ -293,8 +293,13 @@ async function updateLot(req, res) {
     const {
       product_description, quantity, weight_kg, volume_cbm,
       cbm_rate, cbm_amount, bale_qty, bale_amount, copy_qty, copy_amount,
-      small_packing_qty, small_packing_amount, heavy_goods_qty, heavy_goods_amount, final_amount, warehouse_id, notes
+      small_packing_qty, small_packing_amount, heavy_goods_qty, heavy_goods_amount,
+      final_amount, manual_final_amount, payment_status, pickup_status, warehouse_id, notes
     } = req.body;
+
+    const targetFinalAmount = (final_amount !== undefined && final_amount !== null && final_amount !== '')
+      ? final_amount
+      : manual_final_amount;
 
     const result = await pool.query(`
       UPDATE lots
@@ -313,22 +318,35 @@ async function updateLot(req, res) {
           heavy_goods_qty = COALESCE($13, heavy_goods_qty),
           heavy_goods_amount = COALESCE($14, heavy_goods_amount),
           final_amount = COALESCE($15, final_amount),
-          warehouse_id = COALESCE($16, warehouse_id),
-          notes = $17,
+          payment_status = COALESCE($16, payment_status),
+          pickup_status = COALESCE($17, pickup_status),
+          warehouse_id = COALESCE($18, warehouse_id),
+          notes = COALESCE($19, notes),
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $18 AND company_id = $19
+      WHERE id = $20 AND company_id = $21
       RETURNING *
     `, [
       product_description, quantity, weight_kg, volume_cbm,
       cbm_rate, cbm_amount, bale_qty, bale_amount, copy_qty, copy_amount,
-      small_packing_qty, small_packing_amount, heavy_goods_qty, heavy_goods_amount, final_amount, warehouse_id || null, notes || null, id, companyId
+      small_packing_qty, small_packing_amount, heavy_goods_qty, heavy_goods_amount,
+      targetFinalAmount, payment_status, pickup_status, warehouse_id || null, notes !== undefined ? notes : null, id, companyId
     ]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Lot non trouvé.' });
     }
 
-    return res.json({ lot: result.rows[0] });
+    const updatedLot = result.rows[0];
+
+    logAudit(req, {
+      action: 'UPDATE_LOT',
+      action_type: 'update',
+      entity_type: 'lot',
+      entity_id: id,
+      description: `Modification du lot client "${updatedLot.product_description || 'Lot #' + id}"`
+    });
+
+    return res.json({ lot: updatedLot, message: 'Lot mis à jour avec succès.' });
   } catch (err) {
     console.error('Erreur updateLot:', err);
     return res.status(500).json({ error: 'Erreur lors de la modification du lot.' });

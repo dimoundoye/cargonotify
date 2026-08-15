@@ -12,10 +12,64 @@ interface NotificationItem {
   client_phone: string;
   lot_id: number;
   product_description: string;
+  total_due?: number;
   remaining_balance: number;
+  raw_template?: string;
+  company_name?: string;
+  company_phone?: string;
+  container_number?: string;
+  origin?: string;
+  currency?: string;
   message: string;
   wa_link: string;
 }
+
+const formatFrontendArrivalMessage = (
+  template: string | undefined,
+  companyName: string,
+  companyPhone: string,
+  clientName: string,
+  containerNumber: string,
+  origin: string,
+  productDesc: string,
+  totalDue: number,
+  remainingDue: number,
+  pickupLocationsText: string,
+  currency: string = 'FCFA'
+) => {
+  const defaultTemplate = `📦 *[Nom Société] — Notification d'arrivée de Marchandise*
+
+Bonjour *[Nom du Client]*,
+
+Nous avons le plaisir de vous informer que le conteneur *N° [Code Conteneur]* (Provenance : [Provenance]) est bien arrivé !
+
+📋 *Vos Colis concernés :*
+[Description des marchandise]
+
+💰 *Statut Financier :*
+- Montant Total : *[Montant FCFA]*
+- Reste à régler pour retrait : *[Solde FCFA]*
+
+📍 *Lieux de retrait disponibles :*
+[Lieux de Retrait]
+
+Merci de vous munir de votre pièce d'identité et de votre reçu de paiement pour la remise.
+Pour toute question, contactez-nous directement au [Téléphone Support].`;
+
+  let msg = (template && template.trim()) ? template : defaultTemplate;
+
+  msg = msg.replace(/\[(Nom Société|Nom Entreprise|Entreprise|Société)\]/gi, companyName || 'CargoNotify');
+  msg = msg.replace(/\[(Nom du Client|Nom Client|Client)\]/gi, clientName || 'Client');
+  msg = msg.replace(/\[(Code Conteneur|N° Conteneur|Numero Conteneur|Conteneur)\]/gi, containerNumber || '');
+  msg = msg.replace(/\[(Provenance|Origine)\]/gi, origin || '');
+  msg = msg.replace(/\[(Description des marchandise|Description des marchandises|Marchandises|Marchandise|Colis)\]/gi, productDesc || '');
+  msg = msg.replace(/\[(Montant FCFA|Montant Total|Montant)\]/gi, `${parseFloat(totalDue as any || 0).toLocaleString('fr-FR')} ${currency}`);
+  msg = msg.replace(/\[(Solde FCFA|Solde|Reste à régler)\]/gi, `${parseFloat(remainingDue as any || 0).toLocaleString('fr-FR')} ${currency}`);
+  msg = msg.replace(/\[(Lieux de Retrait|Lieux de retrait disponibles|Lieu de Retrait|Entrepôts)\]/gi, pickupLocationsText || '');
+  msg = msg.replace(/\[(Téléphone Support|Tél Support|Contact Support|Téléphone)\]/gi, companyPhone || '');
+
+  return msg;
+};
 
 interface WhatsAppStatus {
   isConnected: boolean;
@@ -136,7 +190,19 @@ export const WhatsAppPage: React.FC = () => {
         initialSelections[n.lot_id] = defaultWhIds;
 
         const locText = generateLocationsText(defaultWhIds, currentWarehouses);
-        const updatedMsg = n.message.replace(/📍 \*Lieux de retrait disponibles :\*\n[\s\S]*?(?=\n\n|$)/, `📍 *Lieux de retrait disponibles :*\n${locText}`);
+        const updatedMsg = formatFrontendArrivalMessage(
+          n.raw_template,
+          n.company_name || '',
+          n.company_phone || '',
+          n.client_name,
+          n.container_number || '',
+          n.origin || '',
+          n.product_description,
+          n.total_due || 0,
+          n.remaining_balance || 0,
+          locText,
+          n.currency || 'FCFA'
+        );
         
         const cleanPhone = n.client_phone.replace(/\D/g, '');
         const fullPhone = cleanPhone.startsWith('221') ? cleanPhone : `221${cleanPhone}`;
@@ -211,7 +277,19 @@ export const WhatsAppPage: React.FC = () => {
         if (n.lot_id !== lotId) return n;
 
         const locText = generateLocationsText(updatedWhIds, warehouses);
-        const updatedMsg = n.message.replace(/📍 \*Lieux de retrait disponibles :\*\n[\s\S]*?(?=\n\n|$)/, `📍 *Lieux de retrait disponibles :*\n${locText}`);
+        const updatedMsg = formatFrontendArrivalMessage(
+          n.raw_template,
+          n.company_name || '',
+          n.company_phone || '',
+          n.client_name,
+          n.container_number || '',
+          n.origin || '',
+          n.product_description,
+          n.total_due || 0,
+          n.remaining_balance || 0,
+          locText,
+          n.currency || 'FCFA'
+        );
 
         const cleanPhone = n.client_phone.replace(/\D/g, '');
         const fullPhone = cleanPhone.startsWith('221') ? cleanPhone : `221${cleanPhone}`;

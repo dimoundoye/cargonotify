@@ -1,5 +1,24 @@
 const pool = require('../config/db');
 
+const DEFAULT_WHATSAPP_TEMPLATE = `📦 *[Nom Société] — Notification d'arrivée de Marchandise*
+
+Bonjour *[Nom du Client]*,
+
+Nous avons le plaisir de vous informer que le conteneur *N° [Code Conteneur]* (Provenance : [Provenance]) est bien arrivé !
+
+📋 *Vos Colis concernés :*
+[Description des marchandise]
+
+💰 *Statut Financier :*
+- Montant Total : *[Montant FCFA]*
+- Reste à régler pour retrait : *[Solde FCFA]*
+
+📍 *Lieux de retrait disponibles :*
+[Lieux de Retrait]
+
+Merci de vous munir de votre pièce d'identité et de votre reçu de paiement pour la remise.
+Pour toute question, contactez-nous directement au [Téléphone Support].`;
+
 // Assurer l'existence des tables et colonnes de configuration et de contrôle d'accès
 async function ensureTablesAndColumns() {
   await pool.query(`
@@ -13,6 +32,7 @@ async function ensureTablesAndColumns() {
       maintenance_mode BOOLEAN DEFAULT FALSE,
       maintenance_message TEXT DEFAULT 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !',
       signature_base64 TEXT,
+      whatsapp_template TEXT,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -23,6 +43,7 @@ async function ensureTablesAndColumns() {
     ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS maintenance_mode BOOLEAN DEFAULT FALSE;
     ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS maintenance_message TEXT DEFAULT 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !';
     ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS signature_base64 TEXT;
+    ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS whatsapp_template TEXT;
 
     ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
   `);
@@ -53,7 +74,8 @@ async function getCompanySettingsData(companyId = 1) {
         currency: (company && company.currency) || settings.currency || 'FCFA',
         maintenance_mode: settings.maintenance_mode || false,
         maintenance_message: settings.maintenance_message || 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !',
-        signature_base64: settings.signature_base64 || null
+        signature_base64: settings.signature_base64 || null,
+        whatsapp_template: settings.whatsapp_template || DEFAULT_WHATSAPP_TEMPLATE
       };
     }
   } catch (e) {
@@ -68,7 +90,8 @@ async function getCompanySettingsData(companyId = 1) {
     currency: 'FCFA',
     maintenance_mode: false,
     maintenance_message: 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !',
-    signature_base64: null
+    signature_base64: null,
+    whatsapp_template: DEFAULT_WHATSAPP_TEMPLATE
   };
 }
 
@@ -84,11 +107,11 @@ async function getCompanySettings(req, res) {
   }
 }
 
-// Route API: Mettre à jour le profil & Cachet/Signature (Admin)
+// Route API: Mettre à jour le profil & Cachet/Signature & Modèle WhatsApp (Admin)
 async function updateCompanySettings(req, res) {
   try {
     const companyId = req.user?.company_id || 1;
-    const { company_name, phone, email, address, currency, maintenance_mode, maintenance_message, signature_base64 } = req.body;
+    const { company_name, phone, email, address, currency, maintenance_mode, maintenance_message, signature_base64, whatsapp_template } = req.body;
 
     // 1. Mettre à jour la table principale des entreprises `companies`
     if (company_name) {
@@ -104,9 +127,9 @@ async function updateCompanySettings(req, res) {
     }
 
     // 2. Mettre à jour la table des paramètres additionnels `company_settings`
-    const result = await pool.query(`
-      INSERT INTO company_settings (id, company_name, phone, email, address, currency, maintenance_mode, maintenance_message, signature_base64, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+    await pool.query(`
+      INSERT INTO company_settings (id, company_name, phone, email, address, currency, maintenance_mode, maintenance_message, signature_base64, whatsapp_template, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE
       SET company_name = COALESCE(EXCLUDED.company_name, company_settings.company_name),
           phone = COALESCE(EXCLUDED.phone, company_settings.phone),
@@ -116,8 +139,8 @@ async function updateCompanySettings(req, res) {
           maintenance_mode = EXCLUDED.maintenance_mode,
           maintenance_message = COALESCE(EXCLUDED.maintenance_message, company_settings.maintenance_message),
           signature_base64 = COALESCE(EXCLUDED.signature_base64, company_settings.signature_base64),
+          whatsapp_template = COALESCE(EXCLUDED.whatsapp_template, company_settings.whatsapp_template),
           updated_at = CURRENT_TIMESTAMP
-      RETURNING *
     `, [
       companyId,
       company_name || 'CargoNotify Transit & Logistique',
@@ -127,7 +150,8 @@ async function updateCompanySettings(req, res) {
       currency || 'FCFA',
       maintenance_mode === true,
       maintenance_message || 'CargoNotify est actuellement en cours de maintenance. Nous serons de retour très bientôt !',
-      signature_base64 || null
+      signature_base64 || null,
+      whatsapp_template || null
     ]);
 
     const updatedData = await getCompanySettingsData(companyId);

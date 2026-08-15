@@ -133,9 +133,9 @@ async function getDashboardStats(req, res) {
             c.container_number,
             c.origin,
             c.status,
-            COALESCE(SUM(DISTINCT cc_sum.total_cost), 0) AS container_costs,
-            COALESCE(SUM(DISTINCT l_sum.total_revenue), 0) AS container_revenue,
-            (COALESCE(SUM(DISTINCT l_sum.total_revenue), 0) - COALESCE(SUM(DISTINCT cc_sum.total_cost), 0)) AS net_profit
+            COALESCE(cc_sum.total_cost, 0) AS container_costs,
+            COALESCE(l_sum.total_revenue, 0) AS container_revenue,
+            (COALESCE(l_sum.total_revenue, 0) - COALESCE(cc_sum.total_cost, 0)) AS net_profit
           FROM containers c
           LEFT JOIN (
             SELECT container_id, SUM(amount) AS total_cost FROM container_costs GROUP BY container_id
@@ -144,7 +144,6 @@ async function getDashboardStats(req, res) {
             SELECT container_id, SUM(final_amount) AS total_revenue FROM lots WHERE company_id = $1 GROUP BY container_id
           ) l_sum ON c.id = l_sum.container_id
           WHERE c.company_id = $1 AND EXTRACT(YEAR FROM c.created_at) = $2
-          GROUP BY c.id
           ORDER BY c.created_at DESC
           LIMIT 10
         `, [companyId, targetYear])
@@ -154,9 +153,9 @@ async function getDashboardStats(req, res) {
             c.container_number,
             c.origin,
             c.status,
-            COALESCE(SUM(DISTINCT cc_sum.total_cost), 0) AS container_costs,
-            COALESCE(SUM(DISTINCT l_sum.total_revenue), 0) AS container_revenue,
-            (COALESCE(SUM(DISTINCT l_sum.total_revenue), 0) - COALESCE(SUM(DISTINCT cc_sum.total_cost), 0)) AS net_profit
+            COALESCE(cc_sum.total_cost, 0) AS container_costs,
+            COALESCE(l_sum.total_revenue, 0) AS container_revenue,
+            (COALESCE(l_sum.total_revenue, 0) - COALESCE(cc_sum.total_cost, 0)) AS net_profit
           FROM containers c
           LEFT JOIN (
             SELECT container_id, SUM(amount) AS total_cost FROM container_costs GROUP BY container_id
@@ -165,7 +164,6 @@ async function getDashboardStats(req, res) {
             SELECT container_id, SUM(final_amount) AS total_revenue FROM lots WHERE company_id = $1 GROUP BY container_id
           ) l_sum ON c.id = l_sum.container_id
           WHERE c.company_id = $1
-          GROUP BY c.id
           ORDER BY c.created_at DESC
           LIMIT 10
         `, [companyId]);

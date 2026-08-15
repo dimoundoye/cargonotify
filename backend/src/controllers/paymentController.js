@@ -474,9 +474,159 @@ async function verifyReceiptQR(req, res) {
   }
 }
 
+// Modifier un règlement (Réservé STRICTEMENT à l'Administrateur)
+async function updatePayment(req, res) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const companyId = getEffectiveCompanyId(req);
+    const { id } = req.params;
+    const { amount_paid, payment_method, notes } = req.body;
+
+    const existingRes = await client.query('SELECT * FROM payments WHERE id = $1 AND company_id = $2', [id, companyId]);
+    if (existingRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Paiement introuvable.' });
+    }
+    const oldPayment = existingRes.rows[0];
+
+    const newAmount = amount_paid !== undefined ? parseFloat(amount_paid) : parseFloat(oldPayment.amount_paid);
+    if (isNaN(newAmount) || newAmount <= 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Montant valide requis.' });
+    }
+
+    const updateRes = await client.query(`
+      UPDATE payments
+      SET amount_paid = $1,
+          payment_method = COALESCE($2, payment_method),
+          notes = COALESCE($3, notes)
+      WHERE id = $4 AND company_id = $5
+      RETURNING *
+    `, [newAmount, payment_method || oldPayment.payment_method, notes !== undefined ? notes : oldPayment.notes, id, companyId]);
+
+    const updatedPayment = updateRes.rows[0];
+    const lotId = oldPayment.lot_id;
+
+    // Recalculer le statut de paiement du lot
+    const lotQuery = await client.query('SELECT * FROM lots WHERE id = $1 AND company_id = $2', [lotId, companyId]);
+    if (lotQuery.rows.length > 0) {
+      const lot = lotQuery.rows[0];
+      const sumResult = await client.query('SELECT COALESCE(SUM(amount_paid), 0) AS total_paid FROM payments WHERE lot_id = $1 AND company_id = $2', [lotId, companyId]);
+      const totalPaid = parseFloat(sumResult.rows[0].total_paid);
+      const finalAmount = parseFloat(lot.final_amount);
+
+      let newPaymentStatus = 'unpaid';
+      if (totalPaid >= finalAmount) {
+        newPaymentStatus = 'paid';
+      } else if (totalPaid > 0) {
+        newPaymentStatus = 'partial';
+      }
+
+      await client.query('UPDATE lots SET payment_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND company_id = $3', [newPaymentStatus, lotId, companyId]);
+
+      if (lot.container_id) {
+        const containerLots = await client.query('SELECT payment_status FROM lots WHERE container_id = $1 AND company_id = $2', [lot.container_id, companyId]);
+        const allPaid = containerLots.rows.length > 0 && containerLots.rows.every(r => r.payment_status === 'paid');
+        await client.query(`
+          UPDATE containers
+          SET status = $1, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $2 AND company_id = $3
+        `, [allPaid ? 'closed' : 'arrived', lot.container_id, companyId]);
+      }
+    }
+
+    await client.query('COMMIT');
+
+    logAudit(req, {
+      action: 'UPDATE_PAYMENT',
+      action_type: 'update',
+      entity_type: 'payment',
+      entity_id: id,
+      description: `Modification du reçu N° ${oldPayment.receipt_number} par un administrateur (Initial: ${oldPayment.amount_paid} FCFA ➔ Nouveau: ${newAmount} FCFA)`
+    });
+
+    return res.json({ payment: updatedPayment, message: 'Paiement modifié avec succès.' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Erreur updatePayment:', err);
+    return res.status(500).json({ error: 'Erreur lors de la modification du paiement.' });
+  } finally {
+    client.release();
+  }
+}
+
+// Supprimer un règlement (Réservé STRICTEMENT à l'Administrateur)
+async function deletePayment(req, res) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const companyId = getEffectiveCompanyId(req);
+    const { id } = req.params;
+
+    const existingRes = await client.query('SELECT * FROM payments WHERE id = $1 AND company_id = $2', [id, companyId]);
+    if (existingRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Paiement introuvable.' });
+    }
+    const oldPayment = existingRes.rows[0];
+
+    await client.query('DELETE FROM payments WHERE id = $1 AND company_id = $2', [id, companyId]);
+    const lotId = oldPayment.lot_id;
+
+    // Recalculer le statut de paiement du lot
+    const lotQuery = await client.query('SELECT * FROM lots WHERE id = $1 AND company_id = $2', [lotId, companyId]);
+    if (lotQuery.rows.length > 0) {
+      const lot = lotQuery.rows[0];
+      const sumResult = await client.query('SELECT COALESCE(SUM(amount_paid), 0) AS total_paid FROM payments WHERE lot_id = $1 AND company_id = $2', [lotId, companyId]);
+      const totalPaid = parseFloat(sumResult.rows[0].total_paid);
+      const finalAmount = parseFloat(lot.final_amount);
+
+      let newPaymentStatus = 'unpaid';
+      if (totalPaid >= finalAmount) {
+        newPaymentStatus = 'paid';
+      } else if (totalPaid > 0) {
+        newPaymentStatus = 'partial';
+      }
+
+      await client.query('UPDATE lots SET payment_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND company_id = $3', [newPaymentStatus, lotId, companyId]);
+
+      if (lot.container_id) {
+        const containerLots = await client.query('SELECT payment_status FROM lots WHERE container_id = $1 AND company_id = $2', [lot.container_id, companyId]);
+        const allPaid = containerLots.rows.length > 0 && containerLots.rows.every(r => r.payment_status === 'paid');
+        await client.query(`
+          UPDATE containers
+          SET status = $1, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $2 AND company_id = $3
+        `, [allPaid ? 'closed' : 'arrived', lot.container_id, companyId]);
+      }
+    }
+
+    await client.query('COMMIT');
+
+    logAudit(req, {
+      action: 'DELETE_PAYMENT',
+      action_type: 'delete',
+      entity_type: 'payment',
+      entity_id: id,
+      description: `Annulation / Suppression du reçu N° ${oldPayment.receipt_number} (${oldPayment.amount_paid} FCFA) par un administrateur`
+    });
+
+    return res.json({ message: 'Paiement supprimé avec succès.' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Erreur deletePayment:', err);
+    return res.status(500).json({ error: 'Erreur lors de la suppression du paiement.' });
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   createPayment,
   getPayments,
+  updatePayment,
+  deletePayment,
   generateReceiptPDF,
   verifyReceiptQR
 };

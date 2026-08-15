@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import api from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 import { Payment, Lot } from '../types';
 import { formatFCFA, formatDate } from '../lib/utils';
-import { CreditCard, Plus, ExternalLink, Share2, Download, FileText, Search } from 'lucide-react';
+import { CreditCard, Plus, ExternalLink, Share2, Download, FileText, Search, Edit2, Trash2, AlertTriangle, X, Printer, Calculator } from 'lucide-react';
 import { SearchableSelect } from '../components/ui/SearchableSelect';
 import { toast } from 'sonner';
 
 export const PaymentsPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
   const [payments, setPayments] = useState<Payment[]>([]);
   const [unpaidLots, setUnpaidLots] = useState<Lot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +23,19 @@ export const PaymentsPage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'wave' | 'om' | 'bank_transfer'>('cash');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Edit Payment State (Admin Only)
+  const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editMethod, setEditMethod] = useState<'cash' | 'wave' | 'om' | 'bank_transfer'>('cash');
+  const [editNotes, setEditNotes] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // Delete Payment Modal (Admin Only)
+  const [deletingPayment, setDeletingPayment] = useState<Payment | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+
 
   const loadData = async () => {
     try {
@@ -78,6 +96,69 @@ export const PaymentsPage: React.FC = () => {
       console.error('Erreur enregistrement règlement:', err);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleOpenEditPayment = (p: Payment) => {
+    setEditingPayment(p);
+    setEditAmount(String(p.amount_paid));
+    setEditMethod((p.payment_method || 'cash') as any);
+    setEditNotes(p.notes || '');
+  };
+
+  const handleUpdatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPayment) return;
+    setSavingEdit(true);
+
+    try {
+      await api.put(`/payments/${editingPayment.id}`, {
+        amount_paid: parseFloat(editAmount),
+        payment_method: editMethod,
+        notes: editNotes || null
+      });
+
+      toast.success(`Reçu N° ${editingPayment.receipt_number} mis à jour avec succès !`);
+      setEditingPayment(null);
+      loadData();
+    } catch (err) {
+      console.error('Erreur modification paiement:', err);
+      toast.error('Erreur lors de la modification du paiement.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleDeletePayment = async () => {
+    if (!deletingPayment) return;
+    setDeleting(true);
+
+    try {
+      await api.delete(`/payments/${deletingPayment.id}`);
+      toast.success(`Le reçu N° ${deletingPayment.receipt_number} a été supprimé !`);
+      setDeletingPayment(null);
+      loadData();
+    } catch (err) {
+      console.error('Erreur suppression paiement:', err);
+      toast.error('Erreur lors de la suppression du paiement.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDownloadConsolidatedInvoice = async (clientId: number, clientName: string) => {
+    try {
+      toast.info(`Génération de la facture regroupée pour ${clientName}...`);
+      const response = await api.get(`/clients/${clientId}/consolidated-invoice/pdf`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      toast.success(`Facture regroupée générée avec succès pour ${clientName} !`);
+    } catch (err: any) {
+      console.error('Erreur génération facture regroupée:', err);
+      toast.error('Erreur lors de la génération de la facture regroupée.');
     }
   };
 
@@ -333,15 +414,35 @@ export const PaymentsPage: React.FC = () => {
                         <span>Partager</span>
                       </button>
 
-                      {/* Button 3: PDF */}
+                      {/* Button 3: PDF Reçu */}
                       <button
                         onClick={() => handleDownloadPdf(p)}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-secondary text-foreground border border-border hover:bg-primary hover:text-white text-[11px] font-extrabold transition-all shadow-sm"
-                        title="Télécharger le fichier PDF sur votre ordinateur"
+                        title="Télécharger le reçu de ce paiement"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span>PDF</span>
+                        <span>Reçu PDF</span>
                       </button>
+
+                      {/* Actions Administrateur : Modifier & Supprimer */}
+                      {isAdmin && (
+                        <div className="flex items-center gap-1 pl-1.5 border-l border-border">
+                          <button
+                            onClick={() => handleOpenEditPayment(p)}
+                            className="p-1.5 rounded-xl bg-card border border-border hover:bg-primary hover:text-white text-muted-foreground transition-all shadow-sm"
+                            title="Modifier ce règlement (Administrateur uniquement)"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingPayment(p)}
+                            className="p-1.5 rounded-xl bg-card border border-border hover:bg-red-600 hover:text-white text-red-500 transition-all shadow-sm"
+                            title="Annuler / Supprimer ce règlement (Administrateur uniquement)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -375,6 +476,21 @@ export const PaymentsPage: React.FC = () => {
                   searchPlaceholder="Tapez le nom d'un client, téléphone ou marchandise..."
                 />
               </div>
+
+              {(() => {
+                const selectedLot = unpaidLots.find(l => String(l.id) === selectedLotId);
+                if (!selectedLot) return null;
+                return (
+                  <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between gap-3 my-2 text-xs">
+                    <div>
+                      <span className="block font-extrabold text-foreground">{selectedLot.client_name}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {selectedLot.product_description} — Reste dû : <strong className="text-emerald-600 font-extrabold">{formatFCFA(selectedLot.remaining_balance || selectedLot.final_amount)}</strong>
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div>
                 <label className="block font-semibold mb-1">Montant du Règlement (FCFA) *</label>
@@ -429,6 +545,114 @@ export const PaymentsPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Modification d'un Règlement (Admin uniquement) */}
+      {editingPayment && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-6">
+            <div className="space-y-1">
+              <h2 className="text-lg font-extrabold flex items-center gap-2 text-foreground">
+                <Edit2 className="w-5 h-5 text-primary" />
+                <span>Modifier le Règlement (Admin)</span>
+              </h2>
+              <p className="text-xs text-muted-foreground">Reçu N° {editingPayment.receipt_number} — {editingPayment.client_name}</p>
+            </div>
+
+            <form onSubmit={handleUpdatePayment} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-semibold mb-1">Montant du Règlement (FCFA) *</label>
+                <input
+                  type="number"
+                  required
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-secondary border border-border rounded-xl font-extrabold text-foreground text-base focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1">Mode de Paiement</label>
+                <select
+                  value={editMethod}
+                  onChange={(e: any) => setEditMethod(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-secondary border border-border rounded-xl font-medium focus:outline-none"
+                >
+                  <option value="cash">Espèces (Cash)</option>
+                  <option value="wave">Wave</option>
+                  <option value="om">Orange Money (OM)</option>
+                  <option value="bank_transfer">Virement Bancaire</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold mb-1">Notes / Référence de transaction</label>
+                <input
+                  type="text"
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  className="w-full px-3 py-2 bg-secondary border border-border rounded-xl"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setEditingPayment(null)}
+                  className="px-4 py-2 rounded-xl hover:bg-secondary font-semibold"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold shadow-md hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {savingEdit ? 'Enregistrement...' : 'Enregistrer la Modification'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmation de Suppression d'un Règlement (Admin uniquement) */}
+      {deletingPayment && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-lg font-extrabold text-foreground">Annuler / Supprimer le Règlement ?</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Êtes-vous sûr de vouloir supprimer le reçu <strong className="text-foreground">N° {deletingPayment.receipt_number}</strong> d'un montant de <strong className="text-foreground">{formatFCFA(deletingPayment.amount_paid)}</strong> pour <strong className="text-foreground">{deletingPayment.client_name}</strong> ?
+              </p>
+              <p className="text-[11px] text-red-500 font-semibold pt-1">
+                Le solde du client sera recalculé et une trace d'annulation sera inscrite dans le journal d'audit.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingPayment(null)}
+                className="flex-1 py-2.5 rounded-xl bg-secondary hover:bg-border text-foreground font-bold text-xs"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleDeletePayment}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md disabled:opacity-50"
+              >
+                {deleting ? 'Suppression...' : 'Oui, Supprimer le Règlement'}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -35,16 +35,28 @@ async function getContainers(req, res) {
     const query = `
       SELECT 
         c.*,
-        COALESCE(SUM(cc.amount), 0) AS total_costs,
-        COUNT(DISTINCT l.id) AS total_lots,
-        COUNT(DISTINCT l.client_id) AS total_clients,
-        COALESCE(SUM(l.final_amount), 0) AS total_revenue,
-        COALESCE(SUM(l.suggested_amount), 0) AS total_suggested_revenue
+        COALESCE(cost_agg.total_costs, 0) AS total_costs,
+        COALESCE(lot_agg.total_lots, 0) AS total_lots,
+        COALESCE(lot_agg.total_clients, 0) AS total_clients,
+        COALESCE(lot_agg.total_revenue, 0) AS total_revenue,
+        COALESCE(lot_agg.total_suggested_revenue, 0) AS total_suggested_revenue
       FROM containers c
-      LEFT JOIN container_costs cc ON c.id = cc.container_id
-      LEFT JOIN lots l ON c.id = l.container_id
+      LEFT JOIN (
+        SELECT container_id, SUM(amount) AS total_costs
+        FROM container_costs
+        GROUP BY container_id
+      ) cost_agg ON c.id = cost_agg.container_id
+      LEFT JOIN (
+        SELECT 
+          container_id, 
+          COUNT(id) AS total_lots, 
+          COUNT(DISTINCT client_id) AS total_clients, 
+          SUM(final_amount) AS total_revenue,
+          SUM(suggested_amount) AS total_suggested_revenue
+        FROM lots
+        GROUP BY container_id
+      ) lot_agg ON c.id = lot_agg.container_id
       WHERE c.company_id = $1
-      GROUP BY c.id
       ORDER BY c.created_at DESC
     `;
     const result = await pool.query(query, [companyId]);

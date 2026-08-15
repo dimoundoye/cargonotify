@@ -284,36 +284,37 @@ export const PlatformAdminPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 pb-16 sm:pb-20 md:p-8 space-y-8 font-sans">
+    <div className="min-h-screen bg-background text-foreground p-3.5 sm:p-6 md:p-8 space-y-6 sm:space-y-8 font-sans">
       {/* Super Admin Console Header */}
-      <div className="p-6 rounded-3xl bg-card border border-border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="p-3.5 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-500/20">
-            <Crown className="w-8 h-8" />
+      <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-card border border-border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+          <div className="p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xl shadow-blue-500/20 shrink-0 mt-0.5 sm:mt-0">
+            <Crown className="w-6 h-6 sm:w-8 sm:h-8" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Console de Gestion de la Plateforme SaaS</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-lg sm:text-2xl font-extrabold tracking-tight text-foreground">Console de Gestion SaaS</h1>
               <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[10px] font-extrabold uppercase">
                 Éditeur / Propriétaire
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Espace réservé au Gestionnaire de l'Application pour piloter le système et valider les entreprises clientes.</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">Espace réservé au Gestionnaire de l'Application pour piloter le système et valider les entreprises clientes.</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto justify-end border-t md:border-t-0 pt-3 md:pt-0 border-border">
           <button
             onClick={loadData}
-            className="p-2.5 rounded-xl bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground border border-border transition-colors"
+            className="p-2.5 rounded-xl bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground border border-border transition-colors flex items-center gap-2 text-xs font-bold"
             title="Rafraîchir les métriques"
           >
             <RefreshCw className="w-4 h-4" />
+            <span className="hidden sm:inline">Actualiser</span>
           </button>
 
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-600 hover:text-white font-extrabold text-xs border border-red-500/20 shadow-sm transition-all"
+            className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-600 text-red-600 hover:text-white font-extrabold text-xs border border-red-500/20 shadow-sm transition-all"
           >
             <LogOut className="w-4 h-4" />
             <span>Déconnexion</span>
@@ -322,64 +323,64 @@ export const PlatformAdminPage: React.FC = () => {
       </div>
 
       {/* Chiffres Clés de la Plateforme SaaS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-card border border-border shadow-sm space-y-2">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-bold uppercase tracking-wider">Total Sociétés & Comptes</span>
             <Users className="w-5 h-5 text-primary" />
           </div>
-          <p className="text-3xl font-black text-foreground">{users.length}</p>
+          <p className="text-2xl sm:text-3xl font-black text-foreground">{users.length}</p>
           <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium">
             <span>{users.filter(u => u.is_active !== false).length} Comptes Actifs</span>
           </div>
         </div>
 
-        <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-2">
+        <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-card border border-border shadow-sm space-y-2">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-bold uppercase tracking-wider">Statut Général du Site</span>
             <Server className="w-5 h-5 text-blue-500" />
           </div>
           <div className="flex items-center gap-2">
-            <span className={`w-3 h-3 rounded-full animate-pulse ${maintenanceMode ? 'bg-red-500' : 'bg-emerald-500'}`} />
-            <p className={`text-xl font-extrabold ${maintenanceMode ? 'text-red-500' : 'text-emerald-600'}`}>
-              {maintenanceMode ? 'Mode Maintenance Actif' : 'Plateforme En Ligne'}
+            <span className={`w-3 h-3 rounded-full animate-pulse shrink-0 ${maintenanceMode ? 'bg-red-500' : 'bg-emerald-500'}`} />
+            <p className={`text-base sm:text-xl font-extrabold truncate ${maintenanceMode ? 'text-red-500' : 'text-emerald-600'}`}>
+              {maintenanceMode ? 'Mode Maintenance' : 'Plateforme En Ligne'}
             </p>
           </div>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground leading-tight">
             {maintenanceMode ? 'Accès restreint aux administrateurs' : 'Accès ouvert à l\'ensemble des utilisateurs'}
           </p>
         </div>
 
-        <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-2">
+        <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-card border border-border shadow-sm space-y-2">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-bold uppercase tracking-wider">Passerelle WhatsApp</span>
             <MessageSquare className="w-5 h-5 text-emerald-600" />
           </div>
           <div className="flex items-center gap-2">
-            <span className={`w-3 h-3 rounded-full ${waStatus?.isConnected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-            <p className="text-xl font-extrabold text-foreground">
-              {waStatus?.isConnected ? 'Connecté (Baileys)' : 'En Attente / Déconnecté'}
+            <span className={`w-3 h-3 rounded-full shrink-0 ${waStatus?.isConnected ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+            <p className="text-base sm:text-xl font-extrabold text-foreground truncate">
+              {waStatus?.isConnected ? 'Connecté (Baileys)' : 'En Attente'}
             </p>
           </div>
           <p className="text-[11px] text-muted-foreground">Passerelle Multi-Session Active</p>
         </div>
 
-        <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-2">
+        <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-card border border-border shadow-sm space-y-2">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-bold uppercase tracking-wider">Identifiant Gestionnaire</span>
             <Crown className="w-5 h-5 text-amber-500" />
           </div>
-          <p className="text-sm font-extrabold text-primary truncate">{user?.email}</p>
+          <p className="text-xs sm:text-sm font-extrabold text-primary truncate max-w-[200px] sm:max-w-none">{user?.email}</p>
           <span className="inline-block px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-extrabold uppercase">
             Rôle: {user?.role}
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         {/* SECTION 1: Interrupteur Mode Maintenance & Contrôle Global */}
         <div className="lg:col-span-1 space-y-6">
-          <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-5">
+          <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-card border border-border shadow-sm space-y-5">
             <h2 className="text-base font-extrabold text-foreground flex items-center gap-2">
               <ShieldAlert className="w-5 h-5 text-amber-500" />
               <span>Contrôle Système & Maintenance</span>
@@ -393,13 +394,13 @@ export const PlatformAdminPage: React.FC = () => {
             )}
 
             {/* Main Switch Card */}
-            <div className={`p-5 rounded-2xl border space-y-4 ${
+            <div className={`p-4 sm:p-5 rounded-2xl border space-y-4 ${
               maintenanceMode 
                 ? 'bg-red-500/10 border-red-500/30' 
                 : 'bg-emerald-500/10 border-emerald-500/30'
             }`}>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase text-muted-foreground">Interrupteur d'Accès au Site</span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold uppercase text-muted-foreground">Interrupteur d'Accès</span>
                 <button
                   type="button"
                   onClick={() => setMaintenanceMode(!maintenanceMode)}
@@ -466,8 +467,8 @@ export const PlatformAdminPage: React.FC = () => {
 
         {/* SECTION 2: Console de Gestion des Utilisateurs & Accès */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-card border border-border shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-base font-extrabold text-foreground flex items-center gap-2">
                   <Users className="w-5 h-5 text-primary" />
@@ -476,10 +477,10 @@ export const PlatformAdminPage: React.FC = () => {
                 <p className="text-xs text-muted-foreground">Inscrivez de nouvelles entreprises de transit et gérez les autorisations de tous les comptes.</p>
               </div>
 
-              <div className="flex items-center gap-2 self-start">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => setIsCompanyModalOpen(true)}
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow hover:bg-primary/90 transition-all"
+                  className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow hover:bg-primary/90 transition-all w-full sm:w-auto"
                 >
                   <Building2 className="w-4 h-4" />
                   <span>Inscrire une Entreprise Cliente</span>
@@ -487,7 +488,7 @@ export const PlatformAdminPage: React.FC = () => {
 
                 <button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs border border-border transition-all"
+                  className="flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground font-bold text-xs border border-border transition-all w-full sm:w-auto"
                 >
                   <Plus className="w-4 h-4 text-primary" />
                   <span>Ajouter un Collaborateur</span>
@@ -507,8 +508,8 @@ export const PlatformAdminPage: React.FC = () => {
               />
             </div>
 
-            {/* Table des Utilisateurs */}
-            <div className="overflow-x-auto border border-border rounded-2xl">
+            {/* Vue Table pour Desktops / Tablettes (md et +) */}
+            <div className="hidden md:block overflow-x-auto border border-border rounded-2xl">
               <table className="w-full text-left text-xs">
                 <thead className="bg-secondary/60 text-muted-foreground font-bold uppercase tracking-wider border-b border-border">
                   <tr>
@@ -527,20 +528,20 @@ export const PlatformAdminPage: React.FC = () => {
                       <tr key={u.id} className={`hover:bg-secondary/30 transition-colors ${!isActive ? 'bg-red-500/5' : ''}`}>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <div className={`w-8 h-8 rounded-xl font-extrabold flex items-center justify-center text-xs ${
+                            <div className={`w-8 h-8 rounded-xl font-extrabold flex items-center justify-center text-xs shrink-0 ${
                               isSuper ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground border border-border'
                             }`}>
                               {u.name.charAt(0).toUpperCase()}
                             </div>
-                            <div>
-                              <p className="font-extrabold text-foreground">{u.name}</p>
-                              <p className="text-[11px] text-muted-foreground">{u.email}</p>
+                            <div className="min-w-0">
+                              <p className="font-extrabold text-foreground truncate">{u.name}</p>
+                              <p className="text-[11px] text-muted-foreground truncate">{u.email}</p>
                             </div>
                           </div>
                         </td>
 
                         <td className="px-4 py-3">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase shrink-0 ${
                             isSuper 
                               ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' 
                               : u.role === 'admin'
@@ -598,16 +599,92 @@ export const PlatformAdminPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* Vue Cartes pour Smartphones (< md) */}
+            <div className="block md:hidden space-y-3">
+              {filteredUsers.map((u) => {
+                const isActive = u.is_active !== false;
+                const isSuper = u.role === 'super_admin';
+
+                return (
+                  <div key={u.id} className={`p-4 rounded-2xl bg-card border border-border shadow-sm space-y-3 ${!isActive ? 'border-red-500/30 bg-red-500/5' : ''}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-9 h-9 rounded-xl font-extrabold flex items-center justify-center text-xs shrink-0 ${
+                          isSuper ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground border border-border'
+                        }`}>
+                          {u.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-extrabold text-foreground text-xs truncate">{u.name}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{u.email}</p>
+                        </div>
+                      </div>
+
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase shrink-0 ${
+                        isSuper 
+                          ? 'bg-amber-500/10 text-amber-600 border border-amber-500/20' 
+                          : u.role === 'admin'
+                          ? 'bg-primary/10 text-primary border border-primary/20'
+                          : 'bg-secondary text-muted-foreground border border-border'
+                      }`}>
+                        {isSuper ? '👑 Super Admin' : u.role === 'admin' ? '⭐ Admin' : u.role}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2.5 border-t border-border/60 text-xs gap-2">
+                      <span className={`font-bold flex items-center gap-1.5 shrink-0 ${isActive ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {isActive ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                        <span>{isActive ? 'Actif' : 'Suspendu'}</span>
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        {u.id !== user?.id && (
+                          <button
+                            onClick={() => handleToggleUserActive(u)}
+                            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold uppercase transition-colors ${
+                              isActive
+                                ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20'
+                                : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border border-emerald-500/20'
+                            }`}
+                          >
+                            {isActive ? 'Bloquer' : 'Débloquer'}
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => handleOpenEdit(u)}
+                          className="p-1.5 rounded-lg bg-secondary hover:bg-primary hover:text-white text-muted-foreground transition-colors"
+                          title="Modifier"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+
+                        {u.id !== user?.id && (
+                          <button
+                            onClick={() => handleDeleteUser(u.id)}
+                            className="p-1.5 rounded-lg bg-secondary hover:bg-red-600 hover:text-white text-red-500 transition-colors"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Modal Inscription Nouvelle Entreprise Cliente & Compte Admin */}
       {isCompanyModalOpen && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4 text-foreground">
+        <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-card border border-border rounded-2xl sm:rounded-3xl max-w-xl w-full p-4 sm:p-6 shadow-2xl space-y-4 text-foreground my-auto">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
                 <Building2 className="w-5 h-5 text-primary" />
                 <span>Inscrire une Nouvelle Société Cliente</span>
               </h3>
@@ -626,12 +703,12 @@ export const PlatformAdminPage: React.FC = () => {
             )}
 
             <form onSubmit={handleCreateCompany} className="space-y-4 text-xs max-h-[75vh] overflow-y-auto pr-1">
-              {/* SECTION 1: PROFIL SOCIÉTÉ (QUI SERA EN LECTURE SEULE CLIENT) */}
-              <div className="p-4 rounded-2xl bg-secondary/50 border border-border space-y-3">
+              {/* SECTION 1: PROFIL SOCIÉTÉ */}
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-secondary/50 border border-border space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="font-extrabold text-primary text-xs flex items-center gap-1.5">
                     <Building2 className="w-4 h-4" />
-                    <span>1. Profil de la Société (Lecture Seule pour le Client)</span>
+                    <span>1. Profil de la Société</span>
                   </h4>
                 </div>
 
@@ -647,7 +724,7 @@ export const PlatformAdminPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">Téléphone Principal *</label>
                     <input
@@ -673,7 +750,7 @@ export const PlatformAdminPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">Adresse du Siège *</label>
                     <input
@@ -701,7 +778,7 @@ export const PlatformAdminPage: React.FC = () => {
               </div>
 
               {/* SECTION 2: IDENTIFIANTS COMPTE ADMIN CLIENT */}
-              <div className="p-4 rounded-2xl bg-secondary/50 border border-border space-y-3">
+              <div className="p-3.5 sm:p-4 rounded-2xl bg-secondary/50 border border-border space-y-3">
                 <h4 className="font-extrabold text-primary text-xs flex items-center gap-1.5">
                   <UserIcon className="w-4 h-4" />
                   <span>2. Identifiants du Compte Administrateur Client</span>
@@ -719,7 +796,7 @@ export const PlatformAdminPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block font-semibold mb-1">Email de Connexion *</label>
                     <input
@@ -770,10 +847,10 @@ export const PlatformAdminPage: React.FC = () => {
 
       {/* Modal Création Utilisateur avec React Portal */}
       {isCreateModalOpen && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 text-foreground">
+        <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-card border border-border rounded-2xl sm:rounded-3xl max-w-md w-full p-4 sm:p-6 shadow-2xl space-y-4 text-foreground my-auto">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
                 <Crown className="w-5 h-5 text-primary" />
                 <span>Créer un Compte Collaborateur</span>
               </h3>
@@ -791,7 +868,7 @@ export const PlatformAdminPage: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleCreateUser} className="space-y-3.5 text-xs">
+            <form onSubmit={handleCreateUser} className="space-y-3.5 text-xs max-h-[75vh] overflow-y-auto pr-1">
               <div>
                 <label className="block font-semibold mb-1">Nom Complet *</label>
                 <input
@@ -880,10 +957,10 @@ export const PlatformAdminPage: React.FC = () => {
 
       {/* Modal Modification Utilisateur avec React Portal */}
       {editingUser && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 text-foreground">
+        <div className="fixed inset-0 z-[9999] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-card border border-border rounded-2xl sm:rounded-3xl max-w-md w-full p-4 sm:p-6 shadow-2xl space-y-4 text-foreground my-auto">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-extrabold flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-extrabold flex items-center gap-2">
                 <Edit2 className="w-5 h-5 text-primary" />
                 <span>Modifier le Compte</span>
               </h3>
@@ -895,7 +972,7 @@ export const PlatformAdminPage: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditUser} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSaveEditUser} className="space-y-3.5 text-xs max-h-[75vh] overflow-y-auto pr-1">
               <div>
                 <label className="block font-semibold mb-1">Nom Complet *</label>
                 <input

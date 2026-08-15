@@ -6,6 +6,7 @@ import { Lot, Container, Client, PricingService, Warehouse } from '../types';
 import { formatFCFA, formatDate } from '../lib/utils';
 import { Package, Plus, Search, Filter, Calculator, CheckCircle2, UserPlus, FileSpreadsheet, Edit2, Trash2, X, AlertTriangle } from 'lucide-react';
 import { SearchableSelect } from '../components/ui/SearchableSelect';
+import { toast } from 'sonner';
 
 const COUNTRY_CODES = [
   { code: '+221', flag: '🇸🇳', name: 'Sénégal (+221)' },
@@ -202,6 +203,7 @@ export const LotsPage: React.FC = () => {
     setEditSubmitting(true);
 
     try {
+      const finalAmt = parseFloat(editFinalAmount) || 0;
       await api.put(`/lots/${editingLot.id}`, {
         product_description: editProductDescription,
         quantity: parseInt(editQuantity, 10) || 1,
@@ -211,16 +213,19 @@ export const LotsPage: React.FC = () => {
         copy_qty: parseFloat(editCopyQty) || 0,
         small_packing_qty: parseInt(editSmallPackingQty, 10) || 0,
         heavy_goods_qty: parseFloat(editHeavyGoodsQty) || 0,
-        manual_final_amount: parseFloat(editFinalAmount) || 0,
+        final_amount: finalAmt,
+        manual_final_amount: finalAmt,
         notes: editNotes || null,
         payment_status: editPaymentStatus,
         pickup_status: editPickupStatus
       });
 
+      toast.success('Lot client mis à jour avec succès !');
       setEditingLot(null);
       loadData();
     } catch (err) {
       console.error('Erreur modification lot:', err);
+      toast.error('Erreur lors de la modification du lot client.');
     } finally {
       setEditSubmitting(false);
     }
@@ -680,7 +685,7 @@ export const LotsPage: React.FC = () => {
                   required
                   value={editProductDescription}
                   onChange={(e) => setEditProductDescription(e.target.value)}
-                  className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-medium"
+                  className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-medium focus:ring-2 focus:ring-primary focus:outline-none"
                 />
               </div>
 
@@ -691,7 +696,7 @@ export const LotsPage: React.FC = () => {
                     type="number"
                     value={editQuantity}
                     onChange={(e) => setEditQuantity(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-bold"
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
                 <div>
@@ -701,7 +706,7 @@ export const LotsPage: React.FC = () => {
                     step="0.01"
                     value={editVolumeCbm}
                     onChange={(e) => setEditVolumeCbm(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-bold text-primary"
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold text-primary focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
                 <div>
@@ -711,7 +716,7 @@ export const LotsPage: React.FC = () => {
                     step="0.1"
                     value={editWeightKg}
                     onChange={(e) => setEditWeightKg(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-bold"
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
               </div>
@@ -723,7 +728,7 @@ export const LotsPage: React.FC = () => {
                     type="number"
                     value={editBaleQty}
                     onChange={(e) => setEditBaleQty(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-bold text-sm"
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
                 <div>
@@ -733,7 +738,7 @@ export const LotsPage: React.FC = () => {
                     step="0.01"
                     value={editCopyQty}
                     onChange={(e) => setEditCopyQty(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-bold text-sm"
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
                 <div>
@@ -742,7 +747,7 @@ export const LotsPage: React.FC = () => {
                     type="number"
                     value={editSmallPackingQty}
                     onChange={(e) => setEditSmallPackingQty(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-bold text-sm"
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
                 <div>
@@ -752,7 +757,7 @@ export const LotsPage: React.FC = () => {
                     step="0.01"
                     value={editHeavyGoodsQty}
                     onChange={(e) => setEditHeavyGoodsQty(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-bold text-sm"
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                   />
                 </div>
               </div>
@@ -764,7 +769,7 @@ export const LotsPage: React.FC = () => {
                   required
                   value={editFinalAmount}
                   onChange={(e) => setEditFinalAmount(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-secondary border border-border rounded-xl font-extrabold text-foreground text-sm"
+                  className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-extrabold text-foreground text-sm focus:ring-2 focus:ring-primary focus:outline-none"
                 />
               </div>
 
@@ -774,7 +779,7 @@ export const LotsPage: React.FC = () => {
                   <select
                     value={editPaymentStatus}
                     onChange={(e: any) => setEditPaymentStatus(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-bold"
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold focus:ring-2 focus:ring-primary focus:outline-none"
                   >
                     <option value="unpaid">En Attente</option>
                     <option value="partial">Partiel</option>
@@ -787,7 +792,7 @@ export const LotsPage: React.FC = () => {
                   <select
                     value={editPickupStatus}
                     onChange={(e: any) => setEditPickupStatus(e.target.value)}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-bold"
+                    className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl font-bold focus:ring-2 focus:ring-primary focus:outline-none"
                   >
                     <option value="pending">En Attente de Retrait</option>
                     <option value="picked_up">Marchandise Retirée</option>
@@ -801,7 +806,7 @@ export const LotsPage: React.FC = () => {
                   rows={2}
                   value={editNotes}
                   onChange={(e) => setEditNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-secondary border border-border rounded-xl"
+                  className="w-full px-3.5 py-2.5 bg-background border border-border rounded-xl focus:ring-2 focus:ring-primary focus:outline-none"
                 ></textarea>
               </div>
 

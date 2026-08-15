@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../lib/api';
+import { toast } from 'sonner';
 import { Client } from '../types';
 import { formatFCFA, formatDate } from '../lib/utils';
 import { 
@@ -106,6 +107,22 @@ export const ClientsPage: React.FC = () => {
       console.error('Erreur chargement historique client:', err);
     } finally {
       setLoadingHistory(false);
+    }
+  };
+
+  const handleDownloadConsolidatedInvoice = async (clientId: number, clientName: string) => {
+    try {
+      toast.info(`Génération de la facture regroupée pour ${clientName}...`);
+      const response = await api.get(`/clients/${clientId}/consolidated-invoice/pdf`, {
+        responseType: 'blob'
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      toast.success(`Facture regroupée générée avec succès !`);
+    } catch (err: any) {
+      console.error('Erreur génération facture regroupée:', err);
+      toast.error('Erreur lors de la génération de la facture regroupée.');
     }
   };
 
@@ -684,7 +701,7 @@ export const ClientsPage: React.FC = () => {
         document.body
       )}
 
-      {/* Pop-up Modal d'avertissement Doublon Téléphone */}
+      {/* Pop-up Modal d'avertissement Doublon Client */}
       {duplicatePhoneError && createPortal(
         <div className="fixed inset-0 z-[10000] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 text-center">
@@ -693,7 +710,7 @@ export const ClientsPage: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-lg font-extrabold text-foreground">Action Impossible (Téléphone Déjà Utilisé)</h3>
+              <h3 className="text-lg font-extrabold text-foreground">Doublon Client Détecté</h3>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 {duplicatePhoneError}
               </p>
@@ -703,7 +720,7 @@ export const ClientsPage: React.FC = () => {
               onClick={() => setDuplicatePhoneError(null)}
               className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-bold shadow-md hover:bg-primary/90 transition-all"
             >
-              Fermer & Rectifier le Numéro
+              Compris
             </button>
           </div>
         </div>,

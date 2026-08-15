@@ -14,7 +14,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('cargo_notify_token');
+  const token = sessionStorage.getItem('cargo_notify_token') || localStorage.getItem('cargo_notify_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -27,6 +27,8 @@ api.interceptors.response.use((response) => {
   return response;
 }, (error) => {
   if (error.response && error.response.status === 401) {
+    sessionStorage.removeItem('cargo_notify_token');
+    sessionStorage.removeItem('cargo_notify_user');
     localStorage.removeItem('cargo_notify_token');
     localStorage.removeItem('cargo_notify_user');
     if (window.location.pathname !== '/login') {

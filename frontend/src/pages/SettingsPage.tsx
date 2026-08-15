@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import api from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,6 +29,25 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+const DEFAULT_WHATSAPP_TEMPLATE = `📦 *[Nom Société] — Notification d'arrivée de Marchandise*
+
+Bonjour *[Nom du Client]*,
+
+Nous avons le plaisir de vous informer que le conteneur *N° [Code Conteneur]* (Provenance : [Provenance]) est bien arrivé !
+
+📋 *Vos Colis concernés :*
+[Description des marchandise]
+
+💰 *Statut Financier :*
+- Montant Total : *[Montant FCFA]*
+- Reste à régler pour retrait : *[Solde FCFA]*
+
+📍 *Lieux de retrait disponibles :*
+[Lieux de Retrait]
+
+Merci de vous munir de votre pièce d'identité et de votre reçu de paiement pour la remise.
+Pour toute question, contactez-nous directement au [Téléphone Support].`;
+
 export const SettingsPage: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'general' | 'pricing' | 'account'>('general');
@@ -40,6 +59,7 @@ export const SettingsPage: React.FC = () => {
   const [companyAddress, setCompanyAddress] = useState('');
   const [currency, setCurrency] = useState('FCFA');
   const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
+  const [whatsappTemplate, setWhatsappTemplate] = useState<string>(DEFAULT_WHATSAPP_TEMPLATE);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const [generalSaveSuccess, setGeneralSaveSuccess] = useState(false);
@@ -97,6 +117,9 @@ export const SettingsPage: React.FC = () => {
         setCompanyAddress(s.address);
         setCurrency(s.currency);
         setSignatureBase64(s.signature_base64 || null);
+        if (s.whatsapp_template) {
+          setWhatsappTemplate(s.whatsapp_template);
+        }
       }
 
       setWarehouses(whRes.data.warehouses);
@@ -124,7 +147,8 @@ export const SettingsPage: React.FC = () => {
         email: companyEmail,
         address: companyAddress,
         currency,
-        signature_base64: signatureBase64
+        signature_base64: signatureBase64,
+        whatsapp_template: whatsappTemplate
       });
 
       setGeneralSaveSuccess(true);
@@ -145,7 +169,8 @@ export const SettingsPage: React.FC = () => {
         email: companyEmail,
         address: companyAddress,
         currency,
-        signature_base64: base64Png
+        signature_base64: base64Png,
+        whatsapp_template: whatsappTemplate
       });
       setGeneralSaveSuccess(true);
       setTimeout(() => setGeneralSaveSuccess(false), 4000);
@@ -154,7 +179,7 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleRemoveSignature = async () => {
+  const handleDeleteSignature = async () => {
     setSignatureBase64(null);
     try {
       await api.put('/settings/company', {
@@ -163,11 +188,50 @@ export const SettingsPage: React.FC = () => {
         email: companyEmail,
         address: companyAddress,
         currency,
-        signature_base64: null
+        signature_base64: null,
+        whatsapp_template: whatsappTemplate
       });
     } catch (err) {
       console.error('Erreur suppression signature:', err);
     }
+  };
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertVariableTag = (tag: string) => {
+    if (textareaRef.current) {
+      const textarea = textareaRef.current;
+      const start = textarea.selectionStart || 0;
+      const end = textarea.selectionEnd || 0;
+      const text = whatsappTemplate;
+      const newText = text.substring(0, start) + tag + text.substring(end);
+      setWhatsappTemplate(newText);
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(start + tag.length, start + tag.length);
+      }, 0);
+    } else {
+      setWhatsappTemplate(prev => prev + ' ' + tag);
+    }
+  };
+
+  const getResolvedPreviewMessage = () => {
+    const whText = warehouses.length > 0 
+      ? warehouses.map((w, i) => `${i + 1}️⃣ ${w.name}${w.address ? ' : ' + w.address : ''}`).join('\n')
+      : '1️⃣ Entrepôt Central Dakar Plateau';
+
+    let msg = whatsappTemplate || DEFAULT_WHATSAPP_TEMPLATE;
+    msg = msg.replace(/\[Nom Société\]/gi, companyName || 'CargoNotify');
+    msg = msg.replace(/\[Nom du Client\]/gi, 'Mamadou Diallo');
+    msg = msg.replace(/\[Code Conteneur\]/gi, 'TGHU-987654');
+    msg = msg.replace(/\[Provenance\]/gi, 'Chine (Ningbo)');
+    msg = msg.replace(/\[Description des marchandise\]/gi, '20 Cartons d\'Accessoires Électroniques');
+    msg = msg.replace(/\[Description des marchandises\]/gi, '20 Cartons d\'Accessoires Électroniques');
+    msg = msg.replace(/\[Montant FCFA\]/gi, `450.000 ${currency || 'FCFA'}`);
+    msg = msg.replace(/\[Solde FCFA\]/gi, `150.000 ${currency || 'FCFA'}`);
+    msg = msg.replace(/\[Lieux de Retrait\]/gi, whText);
+    msg = msg.replace(/\[Téléphone Support\]/gi, companyPhone || '+221 77 123 45 67');
+    return msg;
   };
 
   const handleEditService = (service: PricingService) => {
@@ -495,7 +559,7 @@ export const SettingsPage: React.FC = () => {
                         <span>Changer</span>
                       </button>
                       <button
-                        onClick={handleRemoveSignature}
+                        onClick={handleDeleteSignature}
                         className="px-3 py-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold text-xs border border-red-500/20 flex items-center gap-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -578,34 +642,81 @@ export const SettingsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Aperçu WhatsApp */}
-              <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-4">
-                <h2 className="text-base font-extrabold flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-emerald-600" />
-                  <span>Aperçu du Message WhatsApp Généré (Données Dynamiques)</span>
-                </h2>
+              {/* Modèle de Message WhatsApp Personnalisable */}
+              <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-extrabold flex items-center gap-2 text-foreground">
+                      <MessageSquare className="w-5 h-5 text-emerald-600" />
+                      <span>Modèle du Message WhatsApp (Personnalisable)</span>
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Modifiez librement le texte. Les variables entre crochets <code className="bg-secondary px-1.5 py-0.5 rounded text-primary font-bold">[ ]</code> seront automatiquement remplacées par les données réelles du client.
+                    </p>
+                  </div>
 
-                <div className="p-4 rounded-2xl bg-secondary/50 border border-border">
-                  <pre className="whitespace-pre-wrap font-sans text-xs text-muted-foreground leading-relaxed">
-{`📦 *${companyName || 'CargoNotify'} — Notification d'arrivée de Marchandise*
+                  <button
+                    type="button"
+                    onClick={() => setWhatsappTemplate(DEFAULT_WHATSAPP_TEMPLATE)}
+                    className="px-3.5 py-1.5 rounded-xl bg-secondary hover:bg-border text-muted-foreground hover:text-foreground text-xs font-bold transition-all self-start"
+                  >
+                    Réinitialiser le modèle par défaut
+                  </button>
+                </div>
 
-Bonjour *[Nom du Client]*,
+                {/* Tags de Variables Dynamiques à insérer d'un clic */}
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                    Cliquez sur un tag pour l'insérer dans votre message :
+                  </label>
+                  <div className="flex flex-wrap gap-1.5 text-xs">
+                    {[
+                      { tag: '[Nom du Client]', label: '👤 Nom Client' },
+                      { tag: '[Code Conteneur]', label: '📦 N° Conteneur' },
+                      { tag: '[Provenance]', label: '🌍 Provenance' },
+                      { tag: '[Description des marchandise]', label: '📋 Marchandises' },
+                      { tag: '[Montant FCFA]', label: '💰 Montant Total' },
+                      { tag: '[Solde FCFA]', label: '💳 Reste à régler' },
+                      { tag: '[Lieux de Retrait]', label: '📍 Lieux de Retrait' },
+                      { tag: '[Téléphone Support]', label: '📞 Tél Support' },
+                      { tag: '[Nom Société]', label: '🏢 Nom Société' }
+                    ].map(v => (
+                      <button
+                        key={v.tag}
+                        type="button"
+                        onClick={() => insertVariableTag(v.tag)}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 font-extrabold border border-emerald-500/20 text-xs transition-all flex items-center gap-1"
+                        title={`Insérer ${v.tag}`}
+                      >
+                        <span>{v.label}</span>
+                        <code className="text-[10px] opacity-75">({v.tag})</code>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-Nous avons le plaisir de vous informer que le conteneur *N° [Code Conteneur]* (Provenance : [Provenance]) est bien arrivé !
+                {/* Zone d'Édition du Modèle */}
+                <div>
+                  <textarea
+                    ref={textareaRef}
+                    rows={9}
+                    value={whatsappTemplate}
+                    onChange={(e) => setWhatsappTemplate(e.target.value)}
+                    placeholder="Saisissez votre modèle de message WhatsApp..."
+                    className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-2xl text-xs text-foreground font-mono leading-relaxed focus:outline-none focus:border-primary shadow-inner"
+                  />
+                </div>
 
-📋 *Vos Colis concernés :*
-[Description des marchandise]
-
-💰 *Statut Financier :*
-- Montant Total : *[Montant ${currency || 'FCFA'}]*
-- Reste à régler pour retrait : *[Solde ${currency || 'FCFA'}]*
-
-📍 *Lieux de retrait disponibles :*
-${warehouses.map((w, i) => `${i + 1}️⃣ ${w.name}${w.address ? ' : ' + w.address : ''}`).join('\n')}
-
-Merci de vous munir de votre pièce d'identité et de votre reçu de paiement pour la remise.
-Pour toute question, contactez-nous directement au ${companyPhone}.`}
-                  </pre>
+                {/* Aperçu en temps réel (Résolu avec exemple) */}
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <span className="block text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                    Aperçu du Rendu Final (Exemple en temps réel) :
+                  </span>
+                  <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-foreground">
+                    <pre className="whitespace-pre-wrap font-sans text-xs text-foreground leading-relaxed">
+                      {getResolvedPreviewMessage()}
+                    </pre>
+                  </div>
                 </div>
               </div>
             </div>

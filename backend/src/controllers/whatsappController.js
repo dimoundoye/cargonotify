@@ -3,24 +3,58 @@ const whatsappService = require('../services/whatsappService');
 const { getCompanySettingsData } = require('./settingsController');
 
 // Générer le texte du message de notification d'arrivée pour un client et un conteneur
-function formatArrivalMessage(companyName, companyPhone, clientName, containerNumber, origin, productDesc, totalDue, remainingDue, pickupLocationsText) {
-  return `📦 *${companyName} — Notification d'arrivée de Marchandise*
+function formatArrivalMessage(customTemplate, companyName, companyPhone, clientName, containerNumber, origin, productDesc, totalDue, remainingDue, pickupLocationsText, currency = 'FCFA') {
+  const defaultTemplate = `📦 *[Nom Société] — Notification d'arrivée de Marchandise*
 
-Bonjour *${clientName}*,
+Bonjour *[Nom du Client]*,
 
-Nous avons le plaisir de vous informer que le conteneur *N° ${containerNumber}* (Provenance : ${origin}) est bien arrivé !
+Nous avons le plaisir de vous informer que le conteneur *N° [Code Conteneur]* (Provenance : [Provenance]) est bien arrivé !
 
 📋 *Vos Colis concernés :*
-${productDesc}
+[Description des marchandise]
 
 💰 *Statut Financier :*
-- Montant Total : *${parseFloat(totalDue).toLocaleString('fr-FR')} FCFA*
-- Reste à régler pour retrait : *${parseFloat(remainingDue).toLocaleString('fr-FR')} FCFA*
+- Montant Total : *[Montant FCFA]*
+- Reste à régler pour retrait : *[Solde FCFA]*
 
 📍 *Lieux de retrait disponibles :*
-${pickupLocationsText}
+[Lieux de Retrait]
 
-Merci de vous munir de votre pièce d'identité et de votre reçu de paiement pour la remise.`;
+Merci de vous munir de votre pièce d'identité et de votre reçu de paiement pour la remise.
+Pour toute question, contactez-nous directement au [Téléphone Support].`;
+
+  let msg = (customTemplate && customTemplate.trim()) ? customTemplate : defaultTemplate;
+
+  // 1. Nom Société
+  msg = msg.replace(/\[(Nom Société|Nom Entreprise|Entreprise|Société)\]/gi, companyName || 'CargoNotify');
+
+  // 2. Nom du Client
+  msg = msg.replace(/\[(Nom du Client|Nom Client|Client)\]/gi, clientName || 'Client');
+
+  // 3. Code Conteneur
+  msg = msg.replace(/\[(Code Conteneur|N° Conteneur|Numero Conteneur|Conteneur)\]/gi, containerNumber || '');
+
+  // 4. Provenance
+  msg = msg.replace(/\[(Provenance|Origine)\]/gi, origin || '');
+
+  // 5. Description marchandises
+  msg = msg.replace(/\[(Description des marchandise|Description des marchandises|Marchandises|Marchandise|Colis)\]/gi, productDesc || '');
+
+  // 6. Montant Total
+  const formattedTotal = `${parseFloat(totalDue || 0).toLocaleString('fr-FR')} ${currency}`;
+  msg = msg.replace(/\[(Montant FCFA|Montant Total|Montant)\]/gi, formattedTotal);
+
+  // 7. Solde / Reste à régler
+  const formattedRemaining = `${parseFloat(remainingDue || 0).toLocaleString('fr-FR')} ${currency}`;
+  msg = msg.replace(/\[(Solde FCFA|Solde|Reste à régler)\]/gi, formattedRemaining);
+
+  // 8. Lieux de Retrait
+  msg = msg.replace(/\[(Lieux de Retrait|Lieux de retrait disponibles|Lieu de Retrait|Entrepôts)\]/gi, pickupLocationsText || '');
+
+  // 9. Téléphone Support
+  msg = msg.replace(/\[(Téléphone Support|Tél Support|Contact Support|Téléphone)\]/gi, companyPhone || '');
+
+  return msg;
 }
 
 // Obtenir l'état de la connexion WhatsApp Baileys & QR Code de l'entreprise
@@ -124,6 +158,7 @@ async function getContainerNotificationPreview(req, res) {
         : defaultPickupLocationsText;
 
       const messageText = formatArrivalMessage(
+        company.whatsapp_template,
         company.company_name,
         company.phone,
         item.client_name,
@@ -132,7 +167,8 @@ async function getContainerNotificationPreview(req, res) {
         item.product_description,
         item.final_amount,
         item.remaining_balance,
-        pickupLocationsText
+        pickupLocationsText,
+        company.currency || 'FCFA'
       );
       const waLink = `https://wa.me/${fullPhone}?text=${encodeURIComponent(messageText)}`;
 
@@ -142,7 +178,14 @@ async function getContainerNotificationPreview(req, res) {
         client_phone: item.client_phone,
         lot_id: item.lot_id,
         product_description: item.product_description,
+        total_due: item.final_amount,
         remaining_balance: item.remaining_balance,
+        raw_template: company.whatsapp_template,
+        company_name: company.company_name,
+        company_phone: company.phone,
+        container_number: container.container_number,
+        origin: container.origin,
+        currency: company.currency || 'FCFA',
         message: messageText,
         wa_link: waLink
       };

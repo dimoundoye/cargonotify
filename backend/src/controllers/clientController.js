@@ -1,4 +1,8 @@
+const PDFDocument = require('pdfkit');
+const QRCode = require('qrcode');
 const pool = require('../config/db');
+const { getCompanySettingsData } = require('./settingsController');
+const { logAudit } = require('../utils/auditLogger');
 
 function getEffectiveCompanyId(req) {
   if (req.user && req.user.role === 'super_admin' && req.query.company_id) {
@@ -99,22 +103,24 @@ async function createClient(req, res) {
       return res.status(400).json({ error: 'Le nom et le numéro de téléphone sont obligatoires.' });
     }
 
+    const cleanName = name.trim();
     const cleanPhone = phone.trim();
     const normalizedNew = normalizePhone(cleanPhone);
 
-    // Vérifier l'unicité du numéro de téléphone pour l'entreprise
+    // Vérifier l'unicité du couple (Nom + Numéro de téléphone) pour l'entreprise
     if (normalizedNew && normalizedNew !== '+221' && normalizedNew.length > 5) {
       const existing = await pool.query(`
         SELECT id, name, phone FROM clients 
         WHERE company_id = $1 
-          AND REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '.', ''), '+', '') = $2
+          AND LOWER(TRIM(name)) = LOWER(TRIM($2))
+          AND REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '.', ''), '+', '') = $3
         LIMIT 1
-      `, [companyId, normalizedNew.replace('+', '')]);
+      `, [companyId, cleanName, normalizedNew.replace('+', '')]);
 
       if (existing.rows.length > 0) {
         const match = existing.rows[0];
         return res.status(400).json({
-          error: `BLOCAGE DOUBLON TÉLÉPHONE : Le numéro ${cleanPhone} est déjà attribué au client "${match.name}". Deux clients ne peuvent pas partager le même numéro de téléphone.`
+          error: `DOUBLON DÉTECTÉ : Le client "${match.name}" avec le numéro ${cleanPhone} existe déjà dans votre base de données.`
         });
       }
     }
@@ -123,7 +129,7 @@ async function createClient(req, res) {
       INSERT INTO clients (company_id, name, phone, email, address, notes)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [companyId, name.trim(), cleanPhone, email || null, address || null, notes || null]);
+    `, [companyId, cleanName, cleanPhone, email || null, address || null, notes || null]);
 
     return res.status(201).json({ client: result.rows[0] });
   } catch (err) {
@@ -139,25 +145,31 @@ async function updateClient(req, res) {
     const companyId = getEffectiveCompanyId(req);
     const { name, phone, email, address, notes } = req.body;
 
-    if (phone) {
-      const cleanPhone = phone.trim();
-      const normalizedNew = normalizePhone(cleanPhone);
+    const currentRes = await pool.query('SELECT name, phone FROM clients WHERE id = $1 AND company_id = $2', [id, companyId]);
+    if (currentRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Client non trouvé.' });
+    }
+    const current = currentRes.rows[0];
 
-      if (normalizedNew && normalizedNew !== '+221' && normalizedNew.length > 5) {
-        const existing = await pool.query(`
-          SELECT id, name, phone FROM clients 
-          WHERE company_id = $1 
-            AND id != $2
-            AND REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '.', ''), '+', '') = $3
-          LIMIT 1
-        `, [companyId, id, normalizedNew.replace('+', '')]);
+    const targetName = (name !== undefined && name !== null ? name : current.name).trim();
+    const targetPhone = (phone !== undefined && phone !== null ? phone : current.phone).trim();
+    const normalizedNew = normalizePhone(targetPhone);
 
-        if (existing.rows.length > 0) {
-          const match = existing.rows[0];
-          return res.status(400).json({
-            error: `BLOCAGE DOUBLON TÉLÉPHONE : Le numéro ${cleanPhone} est déjà attribué au client "${match.name}". Impossible d'assigner le même numéro à un autre client.`
-          });
-        }
+    if (normalizedNew && normalizedNew !== '+221' && normalizedNew.length > 5) {
+      const existing = await pool.query(`
+        SELECT id, name, phone FROM clients 
+        WHERE company_id = $1 
+          AND id != $2
+          AND LOWER(TRIM(name)) = LOWER(TRIM($3))
+          AND REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '.', ''), '+', '') = $4
+        LIMIT 1
+      `, [companyId, id, targetName, normalizedNew.replace('+', '')]);
+
+      if (existing.rows.length > 0) {
+        const match = existing.rows[0];
+        return res.status(400).json({
+          error: `DOUBLON DÉTECTÉ : Un autre client nommé "${match.name}" avec le même numéro (${targetPhone}) existe déjà.`
+        });
       }
     }
 
@@ -170,7 +182,7 @@ async function updateClient(req, res) {
           notes = $5
       WHERE id = $6 AND company_id = $7
       RETURNING *
-    `, [name, phone, email || null, address || null, notes || null, id, companyId]);
+    `, [name ? name.trim() : current.name, phone ? phone.trim() : current.phone, email || null, address || null, notes || null, id, companyId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Client non trouvé.' });
