@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 
 export const PaymentsPage: React.FC = () => {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const canEditPayments = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'cashier' || (!!user?.role && user.role.toLowerCase().includes('admin'));
 
   const [payments, setPayments] = useState<Payment[]>([]);
   const [unpaidLots, setUnpaidLots] = useState<Lot[]>([]);
@@ -143,22 +143,6 @@ export const PaymentsPage: React.FC = () => {
       toast.error('Erreur lors de la suppression du paiement.');
     } finally {
       setDeleting(false);
-    }
-  };
-
-  const handleDownloadConsolidatedInvoice = async (clientId: number, clientName: string) => {
-    try {
-      toast.info(`Génération de la facture regroupée pour ${clientName}...`);
-      const response = await api.get(`/clients/${clientId}/consolidated-invoice/pdf`, {
-        responseType: 'blob'
-      });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
-      toast.success(`Facture regroupée générée avec succès pour ${clientName} !`);
-    } catch (err: any) {
-      console.error('Erreur génération facture regroupée:', err);
-      toast.error('Erreur lors de la génération de la facture regroupée.');
     }
   };
 
@@ -424,20 +408,20 @@ export const PaymentsPage: React.FC = () => {
                         <span>Reçu PDF</span>
                       </button>
 
-                      {/* Actions Administrateur : Modifier & Supprimer */}
-                      {isAdmin && (
+                      {/* Actions : Modifier & Supprimer */}
+                      {canEditPayments && (
                         <div className="flex items-center gap-1 pl-1.5 border-l border-border">
                           <button
                             onClick={() => handleOpenEditPayment(p)}
                             className="p-1.5 rounded-xl bg-card border border-border hover:bg-primary hover:text-white text-muted-foreground transition-all shadow-sm"
-                            title="Modifier ce règlement (Administrateur uniquement)"
+                            title="Modifier ce règlement"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => setDeletingPayment(p)}
                             className="p-1.5 rounded-xl bg-card border border-border hover:bg-red-600 hover:text-white text-red-500 transition-all shadow-sm"
-                            title="Annuler / Supprimer ce règlement (Administrateur uniquement)"
+                            title="Annuler / Supprimer ce règlement"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>

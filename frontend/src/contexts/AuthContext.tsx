@@ -26,6 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = (reason?: string) => {
     sessionStorage.removeItem('cargo_notify_token');
     sessionStorage.removeItem('cargo_notify_user');
+    sessionStorage.removeItem('cargo_notify_last_activity');
     localStorage.removeItem('cargo_notify_token');
     localStorage.removeItem('cargo_notify_user');
     if (reason) {
@@ -57,32 +58,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, [token]);
 
-  // Déconnexion automatique après 5 minutes d'inactivité
+  // Déconnexion automatique après 5 minutes d'inactivité (persistant & robuste)
   useEffect(() => {
     if (!token || !user) return;
 
-    lastActivityRef.current = Date.now();
+    if (!sessionStorage.getItem('cargo_notify_last_activity')) {
+      sessionStorage.setItem('cargo_notify_last_activity', Date.now().toString());
+    }
 
-    const resetInactivityTimer = () => {
-      lastActivityRef.current = Date.now();
+    let lastUpdate = 0;
+    const updateActivity = () => {
+      const now = Date.now();
+      if (now - lastUpdate > 3000) {
+        lastUpdate = now;
+        sessionStorage.setItem('cargo_notify_last_activity', now.toString());
+      }
     };
 
-    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
     activityEvents.forEach(event => {
-      window.addEventListener(event, resetInactivityTimer, { passive: true });
+      window.addEventListener(event, updateActivity, { passive: true });
     });
 
-    const checkInterval = setInterval(() => {
-      const now = Date.now();
-      if (now - lastActivityRef.current >= INACTIVITY_TIMEOUT_MS) {
-        logout("Session expirée.");
+    const checkInactivity = () => {
+      const lastAct = Number(sessionStorage.getItem('cargo_notify_last_activity'));
+      if (lastAct && Date.now() - lastAct >= INACTIVITY_TIMEOUT_MS) {
+        logout("Session expirée. Veuillez vous reconnecter.");
       }
-    }, 5000); // Vérification toutes les 5 secondes
+    };
+
+    window.addEventListener('focus', checkInactivity);
+    const checkInterval = setInterval(checkInactivity, 4000);
 
     return () => {
       activityEvents.forEach(event => {
-        window.removeEventListener(event, resetInactivityTimer);
+        window.removeEventListener(event, updateActivity);
       });
+      window.removeEventListener('focus', checkInactivity);
       clearInterval(checkInterval);
     };
   }, [token, user]);
@@ -94,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Stockage en sessionStorage pour expiration à la fermeture d'onglet/navigateur
     sessionStorage.setItem('cargo_notify_token', newToken);
     sessionStorage.setItem('cargo_notify_user', JSON.stringify(userData));
+    sessionStorage.setItem('cargo_notify_last_activity', Date.now().toString());
 
     // Nettoyage de l'ancien localStorage
     localStorage.removeItem('cargo_notify_token');

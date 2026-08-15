@@ -70,8 +70,8 @@ router.delete('/lots/:id', authenticateToken, requireRole('admin'), lotControlle
 // --- Payments & PDF Receipts Routes ---
 router.get('/payments', authenticateToken, requireRole('admin', 'cashier'), paymentController.getPayments);
 router.post('/payments', authenticateToken, requireRole('admin', 'cashier'), paymentController.createPayment);
-router.put('/payments/:id', authenticateToken, requireRole('admin'), paymentController.updatePayment);
-router.delete('/payments/:id', authenticateToken, requireRole('admin'), paymentController.deletePayment);
+router.put('/payments/:id', authenticateToken, requireRole('admin', 'cashier'), paymentController.updatePayment);
+router.delete('/payments/:id', authenticateToken, requireRole('admin', 'cashier'), paymentController.deletePayment);
 router.get('/payments/:id/pdf', authenticateToken, paymentController.generateReceiptPDF);
 router.post('/payments/verify-qr', authenticateToken, paymentController.verifyReceiptQR);
 
