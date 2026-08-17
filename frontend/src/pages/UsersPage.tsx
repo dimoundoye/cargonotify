@@ -55,7 +55,7 @@ const APP_TABS = [
   { id: '/settings', label: 'Paramètres Entreprise', desc: 'Profil de la société et paramètres généraux', icon: Settings }
 ];
 
-const DEFAULT_COLLABORATOR_TABS = ['/dashboard', '/statistics', '/scan-qr', '/containers', '/lots', '/clients', '/expenses'];
+const DEFAULT_COLLABORATOR_TABS = ['/dashboard', '/statistics', '/scan-qr', '/containers', '/lots', '/clients', '/payments', '/expenses'];
 
 export const UsersPage: React.FC = () => {
   const { user: currentUser } = useAuth();

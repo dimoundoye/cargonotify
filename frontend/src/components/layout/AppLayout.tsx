@@ -150,9 +150,9 @@ export const AppLayout: React.FC = () => {
   // Matrice de restriction d'accès au menu selon le rôle de l'utilisateur client
   const roleAccessMap: Record<string, string[]> = {
     admin: ['/dashboard', '/statistics', '/scan-qr', '/containers', '/lots', '/clients', '/payments', '/expenses', '/collaborateurs', '/whatsapp', '/pricing', '/settings'],
-    logistics: ['/dashboard', '/statistics', '/scan-qr', '/containers', '/lots', '/clients', '/expenses'],
+    logistics: ['/dashboard', '/statistics', '/scan-qr', '/containers', '/lots', '/clients', '/payments', '/expenses'],
     cashier: ['/dashboard', '/statistics', '/scan-qr', '/lots', '/clients', '/payments', '/expenses'],
-    agent: ['/dashboard', '/statistics', '/containers', '/clients', '/whatsapp']
+    agent: ['/dashboard', '/statistics', '/containers', '/clients', '/payments', '/whatsapp']
   };
 
   const userRole = user?.role || 'admin';

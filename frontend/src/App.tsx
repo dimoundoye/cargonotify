@@ -186,7 +186,7 @@ function AppRoutes() {
         <Route 
           path="payments" 
           element={
-            <RoleGuard allowedRoles={['admin', 'cashier']} path="/payments">
+            <RoleGuard allowedRoles={['admin', 'logistics', 'cashier', 'agent']} path="/payments">
               <PaymentsPage />
             </RoleGuard>
           } 

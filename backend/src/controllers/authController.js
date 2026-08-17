@@ -70,7 +70,7 @@ async function login(req, res) {
     }
 
     const token = jwt.sign(
-      { id: user.id, name: user.name, email: user.email, role: user.role, warehouse_id: user.warehouse_id, company_id: user.company_id || 1 },
+      { id: user.id, name: user.name, email: user.email, role: user.role, warehouse_id: user.warehouse_id, company_id: user.company_id || 1, allowed_tabs: user.allowed_tabs },
       process.env.JWT_SECRET || 'cargo_notify_super_secret_key_2026_senegal_fret',
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
