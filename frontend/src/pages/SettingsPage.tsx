@@ -64,6 +64,8 @@ export const SettingsPage: React.FC = () => {
 
   const [generalSaveSuccess, setGeneralSaveSuccess] = useState(false);
   const [savingGeneral, setSavingGeneral] = useState(false);
+  const [templateSaveSuccess, setTemplateSaveSuccess] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // Pricing Services State
   const [services, setServices] = useState<PricingService[]>([]);
@@ -193,6 +195,32 @@ export const SettingsPage: React.FC = () => {
       });
     } catch (err) {
       console.error('Erreur suppression signature:', err);
+    }
+  };
+
+  const handleSaveWhatsappTemplate = async () => {
+    setSavingTemplate(true);
+    setTemplateSaveSuccess(false);
+
+    try {
+      await api.put('/settings/company', {
+        company_name: companyName,
+        phone: companyPhone,
+        email: companyEmail,
+        address: companyAddress,
+        currency,
+        signature_base64: signatureBase64,
+        whatsapp_template: whatsappTemplate
+      });
+
+      setTemplateSaveSuccess(true);
+      toast.success('Modèle de message WhatsApp enregistré avec succès !');
+      setTimeout(() => setTemplateSaveSuccess(false), 4000);
+    } catch (err) {
+      console.error('Erreur enregistrement modèle WhatsApp:', err);
+      toast.error('Erreur lors de l\'enregistrement du modèle WhatsApp.');
+    } finally {
+      setSavingTemplate(false);
     }
   };
 
@@ -644,6 +672,13 @@ export const SettingsPage: React.FC = () => {
 
               {/* Modèle de Message WhatsApp Personnalisable */}
               <div className="p-6 rounded-3xl bg-card border border-border shadow-sm space-y-5">
+                {templateSaveSuccess && (
+                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 font-bold text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>Modèle de message WhatsApp enregistré avec succès !</span>
+                  </div>
+                )}
+
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base font-extrabold flex items-center gap-2 text-foreground">
@@ -696,7 +731,7 @@ export const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Zone d'Édition du Modèle */}
-                <div>
+                <div className="space-y-3">
                   <textarea
                     ref={textareaRef}
                     rows={9}
@@ -705,6 +740,19 @@ export const SettingsPage: React.FC = () => {
                     placeholder="Saisissez votre modèle de message WhatsApp..."
                     className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-2xl text-xs text-foreground font-mono leading-relaxed focus:outline-none focus:border-primary shadow-inner"
                   />
+
+                  {/* Bouton d'Enregistrement du Modèle WhatsApp */}
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleSaveWhatsappTemplate}
+                      disabled={savingTemplate}
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{savingTemplate ? 'Enregistrement BD...' : 'Enregistrer le Modèle WhatsApp'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Aperçu en temps réel (Résolu avec exemple) */}
