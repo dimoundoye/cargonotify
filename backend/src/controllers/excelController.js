@@ -8,22 +8,71 @@ function getEffectiveCompanyId(req) {
   return (req.user && req.user.company_id) ? req.user.company_id : 1;
 }
 
-// Utilitaire d'extraction robuste des nombres Excel (gère les entiers avec espaces et décimales avec virgules)
+// Utilitaire d'extraction ultra-robuste des nombres Excel (gère les entiers, décimales, séparateurs de milliers espaces/points/virgules, formules et formats de devises)
 function parseExcelNum(val) {
   if (val === null || val === undefined || val === '') return 0;
-  if (typeof val === 'number') return val;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+
   if (typeof val === 'object') {
-    if (val.result !== undefined) return parseExcelNum(val.result);
-    if (val.formula !== undefined && val.result === undefined) return 0;
+    if (val.result !== undefined && val.result !== null) {
+      if (typeof val.result === 'object' && val.result.error) return 0;
+      return parseExcelNum(val.result);
+    }
+    if (val.text !== undefined && val.text !== null) return parseExcelNum(val.text);
+    if (val.value !== undefined && val.value !== null) return parseExcelNum(val.value);
+    return 0;
   }
-  const s = String(val).trim();
-  if (s.includes('.') || s.includes(',')) {
-    const cleaned = s.replace(/\s/g, '').replace(/\u00A0/g, '').replace(',', '.');
-    const numStr = cleaned.replace(/[^\d.]/g, '');
-    return parseFloat(numStr) || 0;
+
+  let s = String(val).trim();
+  if (!s) return 0;
+
+  // Nettoyer tous les espaces (y compris les espaces insécables Excel \u00A0)
+  s = s.replace(/\s/g, '').replace(/\u00A0/g, '');
+
+  // Conserver uniquement les chiffres, points, virgules et le signe moins
+  s = s.replace(/[^\d.,\-]/g, '');
+  if (!s) return 0;
+
+  // Cas A : Contient à la fois un point '.' et une virgule ',' (ex: "150.000,50" ou "150,000.50")
+  if (s.includes('.') && s.includes(',')) {
+    const lastDot = s.lastIndexOf('.');
+    const lastComma = s.lastIndexOf(',');
+    if (lastComma > lastDot) {
+      // Format européen : "150.000,50" -> le point est le séparateur de milliers, la virgule la décimale
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Format US : "150,000.50" -> la virgule est le séparateur de milliers, le point la décimale
+      s = s.replace(/,/g, '');
+    }
+  } 
+  // Cas B : Contient uniquement des points '.' (ex: "150.000" ou "1.500.000" ou "12.5")
+  else if (s.includes('.')) {
+    const parts = s.split('.');
+    if (parts.length > 2) {
+      // Plusieurs points comme "1.500.000" -> séparateurs de milliers
+      s = parts.join('');
+    } else if (parts[1] && parts[1].length === 3 && parts[0].length >= 1) {
+      // Un seul point suivi d'exactement 3 chiffres comme "150.000" -> séparateur de milliers !
+      s = parts.join('');
+    }
+  } 
+  // Cas C : Contient uniquement des virgules ',' (ex: "150,000" ou "12,5")
+  else if (s.includes(',')) {
+    const parts = s.split(',');
+    if (parts.length > 2) {
+      // Plusieurs virgules comme "1,500,000" -> séparateurs de milliers
+      s = parts.join('');
+    } else if (parts[1] && parts[1].length === 3 && parts[0].length >= 1) {
+      // Une seule virgule suivie d'exactement 3 chiffres comme "150,000" -> séparateur de milliers !
+      s = parts.join('');
+    } else {
+      // Sinon ex: "12,5" -> la virgule est une décimale
+      s = s.replace(',', '.');
+    }
   }
-  const digitsOnly = s.replace(/[^\d]/g, '');
-  return parseFloat(digitsOnly) || 0;
+
+  const num = parseFloat(s);
+  return isNaN(num) ? 0 : num;
 }
 
 // Importation d'un fichier Excel type Classeur.xlsx avec Détection et Confirmation de Doublons
@@ -150,21 +199,27 @@ async function importContainerExcel(req, res) {
       const cbm = parseExcelNum(row.getCell(2).value);
       const pkgs = Math.max(1, Math.round(parseExcelNum(row.getCell(3).value)));
       const cbmRate = parseExcelNum(row.getCell(5).value) || 150000;
-      const cbmAmount = cbm * cbmRate;
+      const cbmAmountExcel = parseExcelNum(row.getCell(6).value);
+      const cbmAmount = cbmAmountExcel > 0 ? cbmAmountExcel : (cbm * cbmRate);
 
       const baleQty = Math.round(parseExcelNum(row.getCell(4).value));
       const baleRate = parseExcelNum(row.getCell(7).value) || 10000;
-      const baleAmount = baleQty * baleRate;
+      const baleAmountExcel = parseExcelNum(row.getCell(8).value);
+      const baleAmount = baleAmountExcel > 0 ? baleAmountExcel : (baleQty * baleRate);
 
       const copyQty = parseExcelNum(row.getCell(9).value);
       const copyRate = parseExcelNum(row.getCell(10).value) || 6000;
-      const copyAmount = copyQty * copyRate;
+      const copyAmountExcel = parseExcelNum(row.getCell(11).value);
+      const copyAmount = copyAmountExcel > 0 ? copyAmountExcel : (copyQty * copyRate);
 
       const smallPackingQty = Math.round(parseExcelNum(row.getCell(12).value));
       const smallPackingRate = parseExcelNum(row.getCell(13).value) || 1000;
-      const smallPackingAmount = smallPackingQty * smallPackingRate;
+      const smallPackingAmountExcel = parseExcelNum(row.getCell(14).value);
+      const smallPackingAmount = smallPackingAmountExcel > 0 ? smallPackingAmountExcel : (smallPackingQty * smallPackingRate);
 
-      const totalGeneralVal = parseExcelNum(row.getCell(15).value) || (cbmAmount + baleAmount + copyAmount + smallPackingAmount);
+      const calculatedSum = cbmAmount + baleAmount + copyAmount + smallPackingAmount;
+      const totalGeneralExcel = parseExcelNum(row.getCell(15).value);
+      const totalGeneralVal = totalGeneralExcel > 0 ? totalGeneralExcel : calculatedSum;
 
       const statusCell = String(row.getCell(16).value || '').trim().toUpperCase();
       const exitDateStr = String(row.getCell(17).value || '').trim() || null;
