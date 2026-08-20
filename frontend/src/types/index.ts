@@ -145,6 +145,7 @@ export interface DashboardStats {
   total_due: number;
   total_costs: number;
   net_profit: number;
+  net_cash_balance: number;
   total_clients: number;
   total_containers: number;
   in_transit_count: number;

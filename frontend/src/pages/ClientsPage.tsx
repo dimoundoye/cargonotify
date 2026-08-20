@@ -510,9 +510,10 @@ export const ClientsPage: React.FC = () => {
                   </select>
 
                   <input
-                    type="text"
+                    type="number"
+                    inputMode="numeric"
                     required
-                    placeholder="Ex: 77 123 45 67 ou 06 12 34 56 78"
+                    placeholder="Ex: 771234567 ou 0612345678"
                     value={phoneBody}
                     onChange={(e) => setPhoneBody(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-secondary border border-border rounded-xl font-bold"
@@ -609,8 +610,10 @@ export const ClientsPage: React.FC = () => {
                   </select>
 
                   <input
-                    type="text"
+                    type="number"
+                    inputMode="numeric"
                     required
+                    placeholder="Ex: 771234567"
                     value={editPhoneBody}
                     onChange={(e) => setEditPhoneBody(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-secondary border border-border rounded-xl font-bold"

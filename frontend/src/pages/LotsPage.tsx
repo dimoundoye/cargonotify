@@ -921,9 +921,10 @@ export const LotsPage: React.FC = () => {
                     ))}
                   </select>
                   <input
-                    type="text"
+                    type="number"
+                    inputMode="numeric"
                     required
-                    placeholder="Ex: 77 123 45 67 ou 06 12 34..."
+                    placeholder="Ex: 771234567 ou 0612345678"
                     value={newClientPhoneBody}
                     onChange={(e) => setNewClientPhoneBody(e.target.value)}
                     className="w-full px-3 py-2 bg-secondary border border-border rounded-xl font-bold"

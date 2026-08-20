@@ -14,7 +14,8 @@ import {
   PlusCircle, 
   MessageSquare,
   ArrowUpRight,
-  Calendar
+  Calendar,
+  Wallet
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
@@ -101,10 +102,10 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Cards Grid — 2 par ligne sur Mobile */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-5">
         {/* CA Total */}
-        <div className="p-3.5 sm:p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col justify-between">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-card border border-border shadow-sm flex flex-col justify-between">
           <div className="flex items-start justify-between gap-1 mb-2 sm:mb-4">
             <span className="text-[10px] sm:text-xs font-extrabold text-muted-foreground uppercase tracking-wider leading-tight">Chiffre d'Affaires</span>
             <div className="p-1.5 sm:p-2.5 rounded-xl bg-blue-500/10 text-blue-600 flex-shrink-0">
@@ -112,27 +113,13 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div>
-            <p className="text-sm sm:text-2xl font-black text-foreground truncate">{formatFCFA(stats?.total_revenue)}</p>
+            <p className="text-sm sm:text-xl font-black text-foreground truncate">{formatFCFA(stats?.total_revenue)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5 hidden sm:block">Sur l'ensemble des lots</p>
           </div>
         </div>
 
-        {/* Bénéfice Net */}
-        <div className="p-3.5 sm:p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col justify-between">
-          <div className="flex items-start justify-between gap-1 mb-2 sm:mb-4">
-            <span className="text-[10px] sm:text-xs font-extrabold text-emerald-600 uppercase tracking-wider leading-tight">Bénéfice Net</span>
-            <div className="p-1.5 sm:p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 flex-shrink-0">
-              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-          </div>
-          <div>
-            <p className="text-sm sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 truncate">{formatFCFA(stats?.net_profit)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5 hidden sm:block">Après coûts conteneurs</p>
-          </div>
-        </div>
-
         {/* Total Encaissé */}
-        <div className="p-3.5 sm:p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col justify-between">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-card border border-border shadow-sm flex flex-col justify-between">
           <div className="flex items-start justify-between gap-1 mb-2 sm:mb-4">
             <span className="text-[10px] sm:text-xs font-extrabold text-muted-foreground uppercase tracking-wider leading-tight">Total Encaissé</span>
             <div className="p-1.5 sm:p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 flex-shrink-0">
@@ -140,13 +127,29 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div>
-            <p className="text-sm sm:text-2xl font-black text-foreground truncate">{formatFCFA(stats?.total_collected)}</p>
+            <p className="text-sm sm:text-xl font-black text-foreground truncate">{formatFCFA(stats?.total_collected)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5 hidden sm:block">Règlements reçus</p>
           </div>
         </div>
 
+        {/* Solde (Encaissé - Dépenses) */}
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-card border border-border shadow-sm flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-1 mb-2 sm:mb-4">
+            <span className="text-[10px] sm:text-xs font-extrabold text-teal-600 uppercase tracking-wider leading-tight">Solde Net</span>
+            <div className="p-1.5 sm:p-2.5 rounded-xl bg-teal-500/10 text-teal-600 flex-shrink-0">
+              <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+          </div>
+          <div>
+            <p className={`text-sm sm:text-xl font-black truncate ${(stats?.net_cash_balance ?? 0) >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'}`}>
+              {formatFCFA(stats?.net_cash_balance)}
+            </p>
+            <p className="text-[10px] text-muted-foreground mt-0.5 hidden sm:block">Encaissé − Dépenses</p>
+          </div>
+        </div>
+
         {/* Reste à Recouvrer */}
-        <div className="p-3.5 sm:p-6 rounded-2xl bg-card border border-border shadow-sm flex flex-col justify-between">
+        <div className="p-3.5 sm:p-5 rounded-2xl bg-card border border-border shadow-sm flex flex-col justify-between">
           <div className="flex items-start justify-between gap-1 mb-2 sm:mb-4">
             <span className="text-[10px] sm:text-xs font-extrabold text-amber-600 uppercase tracking-wider leading-tight">Reste à Recouvrer</span>
             <div className="p-1.5 sm:p-2.5 rounded-xl bg-amber-500/10 text-amber-600 flex-shrink-0">
@@ -154,8 +157,22 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
           <div>
-            <p className="text-sm sm:text-2xl font-black text-amber-600 dark:text-amber-400 truncate">{formatFCFA(stats?.total_due)}</p>
+            <p className="text-sm sm:text-xl font-black text-amber-600 dark:text-amber-400 truncate">{formatFCFA(stats?.total_due)}</p>
             <p className="text-[10px] text-muted-foreground mt-0.5 hidden sm:block">En attente de solde</p>
+          </div>
+        </div>
+
+        {/* Bénéfice Net */}
+        <div className="col-span-2 sm:col-span-1 p-3.5 sm:p-5 rounded-2xl bg-card border border-border shadow-sm flex flex-col justify-between">
+          <div className="flex items-start justify-between gap-1 mb-2 sm:mb-4">
+            <span className="text-[10px] sm:text-xs font-extrabold text-emerald-600 uppercase tracking-wider leading-tight">Bénéfice Net</span>
+            <div className="p-1.5 sm:p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 flex-shrink-0">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+          </div>
+          <div>
+            <p className="text-sm sm:text-xl font-black text-emerald-600 dark:text-emerald-400 truncate">{formatFCFA(stats?.net_profit)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5 hidden sm:block">CA − Dépenses totales</p>
           </div>
         </div>
       </div>

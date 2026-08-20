@@ -102,3 +102,14 @@ body {
   backdrop-filter: blur(12px);
   border: 1px solid hsl(var(--border));
 }
+
+/* Suppression des flèches (spinners) sur les inputs de type number */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
