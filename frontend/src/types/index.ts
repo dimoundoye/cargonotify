@@ -144,6 +144,8 @@ export interface DashboardStats {
   total_collected: number;
   total_due: number;
   total_costs: number;
+  total_company_expenses?: number;
+  total_container_costs?: number;
   net_profit: number;
   net_cash_balance: number;
   total_clients: number;

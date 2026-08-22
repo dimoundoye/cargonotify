@@ -144,7 +144,7 @@ export const DashboardPage: React.FC = () => {
             <p className={`text-sm sm:text-xl font-black truncate ${(stats?.net_cash_balance ?? 0) >= 0 ? 'text-teal-600 dark:text-teal-400' : 'text-rose-600 dark:text-rose-400'}`}>
               {formatFCFA(stats?.net_cash_balance)}
             </p>
-            <p className="text-[10px] text-muted-foreground mt-0.5 hidden sm:block">Encaissé − Dépenses</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5 hidden sm:block">Encaissé − Dépenses d'exploitation</p>
           </div>
         </div>
 

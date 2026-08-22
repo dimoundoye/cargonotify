@@ -100,7 +100,7 @@ async function getDashboardStats(req, res) {
     const total_company_expenses = parseFloat(companyExpensesQuery.rows[0].total_expenses);
     const total_costs = total_container_costs + total_company_expenses;
     const net_profit = total_revenue - total_costs;
-    const net_cash_balance = total_collected - total_costs;
+    const net_cash_balance = total_collected - total_company_expenses;
 
     // Compte des Conteneurs par Statut
     const containerStatsQuery = targetYear
@@ -204,6 +204,8 @@ async function getDashboardStats(req, res) {
         total_collected,
         total_due,
         total_costs,
+        total_company_expenses,
+        total_container_costs,
         net_profit,
         net_cash_balance,
         total_clients: parseInt(clientCountQuery.rows[0].total_clients, 10),
